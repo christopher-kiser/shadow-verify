@@ -10,6 +10,7 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
@@ -57,7 +58,10 @@ def main() -> int:
                 "us-east-1",
                 "--evidence",
                 str(evidence),
-            ]
+                "--mode",
+                "MOCKED",
+            ],
+            clock=lambda: datetime(2026, 11, 3, 6, 0, tzinfo=timezone.utc),
         )
     print(f"evidence bundle: {evidence}", file=sys.stderr)
     if code != 1:

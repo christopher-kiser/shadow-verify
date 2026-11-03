@@ -2,7 +2,9 @@
 
 The policy file is [iam-policy.json](iam-policy.json). A test checks that its Allow actions are exactly `ALLOWED_OPERATIONS` and its Deny actions are exactly `DENIED_OPERATIONS` in `src/shadow_verify/aws.py`.
 
-Allow actions are the `service:Operation` pairs the client actually calls. There is no `s3:Get*`, no `iam:Get*`, and no AWS managed `ReadOnlyAccess` policy. v0 does not call `s3:GetBucketPolicy`. Publicity comes from `GetBucketPolicyStatus`.
+Allow actions are the IAM actions for the API operations the client calls. The map is `OPERATION_IAM_ACTIONS` in `src/shadow_verify/aws.py`. `GetPublicAccessBlock` requires `s3:GetBucketPublicAccessBlock`, not `s3:GetPublicAccessBlock`. There is no `s3:Get*`, no `iam:Get*`, and no AWS managed `ReadOnlyAccess` policy. v0 does not call `s3:GetBucketPolicy`. Publicity comes from `GetBucketPolicyStatus`.
+
+Each client uses botocore standard retries, `max_attempts` 3, a 3 second connect timeout, and a 10 second read timeout. The worst case for one call is about 52 seconds: three attempts at 13 seconds each, plus at most 13 seconds of backoff and retry-after across the two gaps.
 
 Deny actions are data and secret reads: `secretsmanager:GetSecretValue`, `s3:GetObject`, `ssm:GetParameter`, `ssm:GetParameters`, `kms:Decrypt`, `dynamodb:GetItem`, `dynamodb:Query`, `dynamodb:Scan`, `lambda:GetFunction`, and `ec2:GetPasswordData`. The client refuses those, and any other call that is not on the allowlist, before it looks up a boto3 method. A write such as `s3:PutBucketPolicy` is refused the same way.
 

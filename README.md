@@ -36,11 +36,10 @@ These commands were run on Linux. Windows: NOT ASSESSED.
 
 | Code | `run` | `verify` |
 | --- | --- | --- |
-| 0 | No claim is FAIL. NOT ASSESSED is included unless `--fail-on-not-assessed` is set. | Item and bundle hashes match. |
-| 1 | Any claim is FAIL. Also any NOT ASSESSED when `--fail-on-not-assessed` is set. | A hash does not match. |
-| 2 | The claims file, plan file, or invocation is invalid. | The bundle cannot be read as JSON. |
-
-The GitHub Action sets `--fail-on-not-assessed`, so a job that cannot read AWS is not green.
+| 0 | Every claim is PASS. | Item and bundle hashes match. |
+| 1 | Any claim is FAIL. FAIL outranks NOT ASSESSED. | |
+| 2 | No FAIL, and at least one claim is NOT ASSESSED. | |
+| 3 | The claims file, plan, profile, or an unexpected crash. | The bundle is unreadable or a hash does not match. |
 
 ## Verdicts
 
@@ -77,7 +76,7 @@ The check reads the account after a change is deployed. [examples/github-workflo
 - AWS calls are an exact allowlist of `service:Operation` pairs. Secret and data reads are denied first. Anything else is refused before a boto3 method is called. See [docs/iam-policy.json](docs/iam-policy.json).
 - `run` accepts a boto3 Session, so a harness can count calls or simulate AccessDenied without this process building its own session.
 - Credentials stay in the AWS chain or in the OIDC session the action exports. The tool does not write them into the evidence bundle. Secret-like fields are redacted before hashing.
-- Evidence can still contain account ids and IAM policy documents. Treat the bundle as sensitive and do not commit bundles from real accounts.
+- The stored bundle replaces account ids with `account-N` labels. It can still contain role names and policy documents. Treat it as sensitive and do not commit bundles from a real account. See [THREAT_MODEL.md](THREAT_MODEL.md).
 - A denied, throttled, or timed-out call is NOT ASSESSED. Missing permission is not treated as proof that a resource is safe.
 
 ## Development

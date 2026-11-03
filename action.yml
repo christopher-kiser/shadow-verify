@@ -25,10 +25,6 @@ inputs:
     description: Optional terraform show -json file. Informational in v0.
     required: false
     default: ""
-  fail-on-not-assessed:
-    description: Fail the job when any claim is NOT ASSESSED. Default true so a check that cannot read AWS is not green.
-    required: false
-    default: "true"
   comment-on-pr:
     description: Post the verdict as a pull request comment.
     required: false
@@ -64,15 +60,11 @@ runs:
         SV_REGION: ${{ inputs.aws-region }}
         SV_EVIDENCE: ${{ inputs.evidence-path }}
         SV_PLAN: ${{ inputs.plan-file }}
-        SV_STRICT: ${{ inputs.fail-on-not-assessed }}
       run: |
         set +e
         args=(run --claims "$SV_CLAIMS" --region "$SV_REGION" --evidence "$SV_EVIDENCE" --json)
         if [ -n "$SV_PLAN" ]; then
           args+=(--plan "$SV_PLAN")
-        fi
-        if [ "$SV_STRICT" = "true" ]; then
-          args+=(--fail-on-not-assessed)
         fi
         python -m shadow_verify "${args[@]}" > "$RUNNER_TEMP/shadow-verify.json"
         code=$?
@@ -170,6 +162,6 @@ runs:
         SV_CODE: ${{ steps.verify.outputs.code }}
       run: |
         case "$SV_CODE" in
-          0|1|2) exit "$SV_CODE" ;;
+          0|1|2|3) exit "$SV_CODE" ;;
           *) echo "unexpected verifier status: $SV_CODE" >&2; exit 2 ;;
         esac

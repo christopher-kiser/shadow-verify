@@ -8,17 +8,19 @@ by any ingress permission. A permission covers a forbidden rule when:
   permission
 * the permission's port range overlaps the forbidden range; an
   all-protocol permission covers every port
-* the permission lists the forbidden CIDR with an exact string match on
-  ``CidrIp`` or ``CidrIpv6``
+* the union of its IPv4 or IPv6 CIDRs covers the forbidden network.
+  One wider prefix (a superset) is enough. Several narrower prefixes
+  whose ranges together contain the forbidden network are enough.
+  IPv4 does not cover IPv6.
 
 ``0.0.0.0/0`` does not imply ``::/0``. Security-group and prefix-list
-sources are not CIDRs and do not satisfy a CIDR forbid. A permission that
-matches the protocol and CIDR but has no ports is NOT ASSESSED, not a
-pass.
+sources are not CIDRs and do not count. A permission that matches the
+protocol but has no ports is NOT ASSESSED, not a pass.
 """
 
 from __future__ import annotations
 
+import ipaddress
 from typing import Any
 
 from shadow_verify.aws import BotoAws
@@ -87,6 +89,10 @@ def _validate(claim: Claim) -> list[dict[str, Any]]:
         cidr = rule.get("cidr")
         if not isinstance(cidr, str) or not cidr.strip():
             raise ClaimsError(f"ingress_forbidden[{index}].cidr must be a CIDR string")
+        try:
+            ipaddress.ip_network(cidr, strict=True)
+        except ValueError as exc:
+            raise ClaimsError(f"ingress_forbidden[{index}].cidr is not a network: {cidr}") from exc
         normalized.append(
             {
                 "protocol": protocol,
@@ -125,20 +131,23 @@ def _assess(index: int, rule: dict[str, Any], permissions: list) -> PropertyResu
     label = (
         f"{rule['protocol']} {rule['from_port']}-{rule['to_port']} from {rule['cidr']}"
     )
+    target = ipaddress.ip_network(rule["cidr"], strict=True)
+    observed: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
     unknown = False
     for permission in permissions:
         if not isinstance(permission, dict):
             unknown = True
             continue
-        kind = _permission_covers(permission, rule)
-        if kind == "yes":
-            return PropertyResult(
-                name=name,
-                verdict=Verdict.FAIL,
-                reason=f"ingress allows {label}",
-            )
+        kind, networks = _permission_networks(permission, rule)
+        observed.extend(networks)
         if kind == "unknown":
             unknown = True
+    if _union_covers(observed, target):
+        return PropertyResult(
+            name=name,
+            verdict=Verdict.FAIL,
+            reason=f"ingress allows {label}",
+        )
     if unknown:
         return PropertyResult(
             name=name,
@@ -152,27 +161,26 @@ def _assess(index: int, rule: dict[str, Any], permissions: list) -> PropertyResu
     )
 
 
-def _permission_covers(permission: dict, rule: dict[str, Any]) -> str:
+def _permission_networks(
+    permission: dict,
+    rule: dict[str, Any],
+) -> tuple[str, list[ipaddress.IPv4Network | ipaddress.IPv6Network]]:
     protocol = permission.get("IpProtocol")
     if not isinstance(protocol, str):
-        return "unknown"
+        return "unknown", []
     if not _protocol_covers(protocol, rule["protocol"]):
-        return "no"
-    cidr_state = _cidr_present(permission, rule["cidr"])
-    if cidr_state != "yes":
-        return cidr_state
-    if _norm_protocol(protocol) == "-1":
-        return "yes"
-    if "FromPort" not in permission or "ToPort" not in permission:
-        return "unknown"
-    try:
-        start = int(permission["FromPort"])
-        end = int(permission["ToPort"])
-    except (TypeError, ValueError):
-        return "unknown"
-    if start <= rule["to_port"] and end >= rule["from_port"]:
-        return "yes"
-    return "no"
+        return "no", []
+    if _norm_protocol(protocol) != "-1":
+        if "FromPort" not in permission or "ToPort" not in permission:
+            return "unknown", []
+        try:
+            start = int(permission["FromPort"])
+            end = int(permission["ToPort"])
+        except (TypeError, ValueError):
+            return "unknown", []
+        if not (start <= rule["to_port"] and end >= rule["from_port"]):
+            return "no", []
+    return _networks_from_permission(permission)
 
 
 def _norm_protocol(value: str) -> str:
@@ -191,17 +199,48 @@ def _protocol_covers(actual: str, expected: str) -> bool:
     return actual_norm == expected
 
 
-def _cidr_present(permission: dict, cidr: str) -> str:
-    found = False
+def _networks_from_permission(
+    permission: dict,
+) -> tuple[str, list[ipaddress.IPv4Network | ipaddress.IPv6Network]]:
+    networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+    unknown = False
     for key, field in (("IpRanges", "CidrIp"), ("Ipv6Ranges", "CidrIpv6")):
         ranges = permission.get(key, [])
         if ranges is None:
             continue
         if not isinstance(ranges, list):
-            return "unknown"
+            return "unknown", networks
         for entry in ranges:
             if not isinstance(entry, dict):
-                return "unknown"
-            if entry.get(field) == cidr:
-                found = True
-    return "yes" if found else "no"
+                return "unknown", networks
+            cidr = entry.get(field)
+            if not isinstance(cidr, str) or not cidr:
+                continue
+            try:
+                networks.append(ipaddress.ip_network(cidr, strict=False))
+            except ValueError:
+                unknown = True
+    return ("unknown" if unknown else "no"), networks
+
+
+def _union_covers(
+    observed: list[ipaddress.IPv4Network | ipaddress.IPv6Network],
+    target: ipaddress.IPv4Network | ipaddress.IPv6Network,
+) -> bool:
+    """True when the merged address ranges contain the whole target."""
+
+    spans: list[tuple[int, int]] = []
+    for network in observed:
+        if network.version != target.version:
+            continue
+        spans.append((int(network.network_address), int(network.broadcast_address)))
+    spans.sort()
+    merged: list[list[int]] = []
+    for start, end in spans:
+        if not merged or start > merged[-1][1] + 1:
+            merged.append([start, end])
+        else:
+            merged[-1][1] = max(merged[-1][1], end)
+    left = int(target.network_address)
+    right = int(target.broadcast_address)
+    return any(start <= left and end >= right for start, end in merged)

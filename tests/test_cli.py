@@ -100,7 +100,7 @@ def test_cli_exit_0_on_pass(tmp_path, capsys):
     assert "bundle_sha256:" in captured.out
 
 
-def test_fail_on_not_assessed_flag(tmp_path, capsys):
+def test_exit_2_when_not_assessed(tmp_path, capsys):
     claims = tmp_path / "claims.json"
     _write_claims(claims, "missing", dict(S3_LOCKED), statement="locked", agent_note="")
     with mock_aws():
@@ -113,20 +113,21 @@ def test_fail_on_not_assessed_flag(tmp_path, capsys):
                 str(tmp_path / "evidence.json"),
                 "--region",
                 REGION,
-                "--fail-on-not-assessed",
+                "--mode",
+                "MOCKED",
             ]
         )
-    assert code == 1
+    assert code == 2
     captured = capsys.readouterr()
     assert "NOT ASSESSED" in captured.out
 
 
-def test_bad_claims_exit_2(tmp_path, capsys):
+def test_bad_claims_exit_3(tmp_path, capsys):
     path = tmp_path / "claims.json"
     path.write_text("{", encoding="utf-8")
     code = run(["run", "--claims", str(path)])
     captured = capsys.readouterr()
-    assert code == 2
+    assert code == 3
     assert "error:" in captured.err
 
 
@@ -175,8 +176,9 @@ def test_injected_session_and_clock(tmp_path, capsys):
         clock=lambda: moment,
     )
     captured = capsys.readouterr()
-    assert code == 0
+    assert code == 2
     report = json.loads(captured.out)
+    assert report["mode"] == "LIVE"
     assert report["results"][0]["verdict"] == "NOT_ASSESSED"
     assert any("AccessDenied" in reason for reason in report["results"][0]["reasons"])
     bundle = json.loads(evidence.read_text(encoding="utf-8"))
@@ -186,9 +188,59 @@ def test_injected_session_and_clock(tmp_path, capsys):
     assert ("GetBucketPolicyStatus", {"Bucket": "logs-prod"}) in events
 
 
+def test_exit_3_on_unexpected_crash(tmp_path, monkeypatch, capsys):
+    claims = tmp_path / "claims.json"
+    _write_claims(claims, "logs-prod", dict(S3_LOCKED), statement="locked", agent_note="")
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("forced crash")
+
+    monkeypatch.setattr("shadow_verify.cli._run_claims", boom)
+    code = run(["run", "--claims", str(claims), "--evidence", str(tmp_path / "evidence.json")])
+    captured = capsys.readouterr()
+    assert code == 3
+    assert "forced crash" in captured.err
+
+
+def test_two_mocked_moto_runs_hash_the_same(tmp_path, capsys):
+    from datetime import datetime, timezone
+
+    claims = tmp_path / "claims.json"
+    _write_claims(claims, "logs-prod", dict(S3_LOCKED), statement="locked", agent_note="note")
+    moment = datetime(2026, 11, 3, 6, 0, tzinfo=timezone.utc)
+    hashes = []
+    for name in ("one.json", "two.json"):
+        evidence = tmp_path / name
+        with mock_aws():
+            _lock_bucket("logs-prod", block_public_policy=False)
+            code = run(
+                [
+                    "run",
+                    "--claims",
+                    str(claims),
+                    "--evidence",
+                    str(evidence),
+                    "--region",
+                    REGION,
+                    "--mode",
+                    "MOCKED",
+                    "--json",
+                ],
+                clock=lambda moment=moment: moment,
+            )
+        assert code == 1
+        text = evidence.read_text(encoding="utf-8")
+        assert "ResponseMetadata" not in text
+        bundle = json.loads(text)
+        assert bundle["mode"] == "MOCKED"
+        hashes.append(bundle["bundle_sha256"])
+        capsys.readouterr()
+    assert hashes[0] == hashes[1]
+
+
 def test_tampered_bundle_fails_verification(tmp_path, capsys):
     path = tmp_path / "evidence.json"
     path.write_text(json.dumps({"items": [], "bundle_sha256": "nope"}) + "\n", encoding="utf-8")
-    assert run(["verify", str(path)]) == 1
+    assert run(["verify", str(path)]) == 3
     captured = capsys.readouterr()
     assert "hash check failed" in captured.err

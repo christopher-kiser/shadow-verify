@@ -10,13 +10,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from shadow_verify.errors import ShadowVerifyError
 from shadow_verify.evidence import EvidenceItem, EvidenceLog
 
-# Exact service:Operation pairs this process calls. Not a verb prefix.
-# docs/iam-policy.json Allow actions must stay equal to this set.
+# API operations this process calls. Not a verb prefix.
 ALLOWED_OPERATIONS: frozenset[str] = frozenset(
     {
         "s3:GetPublicAccessBlock",
@@ -31,20 +31,55 @@ ALLOWED_OPERATIONS: frozenset[str] = frozenset(
     }
 )
 
+# IAM action required to call each API operation. These names differ when
+# the API name is not the IAM action (GetPublicAccessBlock is
+# s3:GetBucketPublicAccessBlock; ListObjectsV2 and HeadBucket are s3:ListBucket).
+OPERATION_IAM_ACTIONS: dict[str, str] = {
+    "s3:GetPublicAccessBlock": "s3:GetBucketPublicAccessBlock",
+    "s3:GetBucketPolicyStatus": "s3:GetBucketPolicyStatus",
+    "ec2:DescribeSecurityGroups": "ec2:DescribeSecurityGroups",
+    "iam:GetRole": "iam:GetRole",
+    "iam:ListAttachedRolePolicies": "iam:ListAttachedRolePolicies",
+    "iam:ListRolePolicies": "iam:ListRolePolicies",
+    "iam:GetRolePolicy": "iam:GetRolePolicy",
+    "iam:GetPolicy": "iam:GetPolicy",
+    "iam:GetPolicyVersion": "iam:GetPolicyVersion",
+}
+
 # Data and secret reads. Refused even if someone later adds them to the allowlist.
 DENIED_OPERATIONS: frozenset[str] = frozenset(
     {
         "secretsmanager:GetSecretValue",
         "s3:GetObject",
+        "s3:GetObjectVersion",
         "ssm:GetParameter",
         "ssm:GetParameters",
+        "ssm:GetParametersByPath",
+        "ssm:GetParameterHistory",
         "kms:Decrypt",
         "dynamodb:GetItem",
+        "dynamodb:BatchGetItem",
         "dynamodb:Query",
         "dynamodb:Scan",
+        "dynamodb:ExecuteStatement",
         "lambda:GetFunction",
         "ec2:GetPasswordData",
     }
+)
+
+# standard mode, max_attempts includes the first try. Two later tries wait
+# at most min(scale * 2^(n-1), 20) seconds, plus up to 5s of retry-after.
+# Throttling scale is 1, so the two gaps are at most 1+5 and 2+5 seconds.
+# Each attempt can also spend connect_timeout + read_timeout.
+# Worst case: 3 * (3 + 10) + 13 = 52 seconds per call.
+CONNECT_TIMEOUT_SECONDS = 3
+READ_TIMEOUT_SECONDS = 10
+MAX_ATTEMPTS = 3
+WORST_CASE_WAIT_SECONDS = 52
+CLIENT_CONFIG = Config(
+    retries={"mode": "standard", "max_attempts": MAX_ATTEMPTS},
+    connect_timeout=CONNECT_TIMEOUT_SECONDS,
+    read_timeout=READ_TIMEOUT_SECONDS,
 )
 
 _MAX_PAGES = 50
@@ -107,9 +142,9 @@ class BotoAws:
         """
 
         return cls(
-            s3=session.client("s3", region_name=region),
-            ec2=session.client("ec2", region_name=region),
-            iam=session.client("iam", region_name=region),
+            s3=session.client("s3", region_name=region, config=CLIENT_CONFIG),
+            ec2=session.client("ec2", region_name=region, config=CLIENT_CONFIG),
+            iam=session.client("iam", region_name=region, config=CLIENT_CONFIG),
             evidence=evidence,
         )
 

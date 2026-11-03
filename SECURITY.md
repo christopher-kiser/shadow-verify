@@ -10,11 +10,11 @@ Credentials come from the AWS SDK chain or from GitHub OIDC in the composite act
 
 ## Evidence bundles
 
-Bundles contain the API responses used for the verdict. That can include account ids, role ARNs, and IAM policy documents. Treat them as sensitive. Do not commit bundles from a real account. v0 hashes the bundle after redacting secret-bearing fields. It does not sign it. `shadow-verify verify` checks that the file still matches its own digests. A digest copied to a pull request comment is what makes a later edit visible.
+The stored bundle replaces twelve-digit account ids with `account-N` labels and redacts secret-bearing fields before the RFC 8785 hash. It can still contain role names and policy documents. Treat it as sensitive. Do not commit bundles from a real account. v0 does not sign the bundle. `shadow-verify verify` checks that the file still matches its own digests. A digest copied somewhere else is what makes a later edit visible. See `THREAT_MODEL.md`.
 
 ## GitHub Action
 
-The action installs this repository and can assume `role-to-assume`. Pin `action.yml` and the actions it uses (`setup-python`, `configure-aws-credentials`, `upload-artifact`, `github-script`) to commit SHAs before you depend on them in production. Grant `id-token: write` and `pull-requests: write` only on the workflow that should post the verdict.
+The action installs this repository and can assume `role-to-assume`. `action.yml` already pins `setup-python`, `configure-aws-credentials`, `upload-artifact`, and `github-script` to commit SHAs. The example workflow's own `uses:` line is still a placeholder SHA because this repository has no release commit. Grant `id-token: write` only on the job that assumes the role. Do not grant it on fork pull requests. Grant `pull-requests: write` only if that workflow posts a comment. The example does not.
 
 ## Reporting a vulnerability
 

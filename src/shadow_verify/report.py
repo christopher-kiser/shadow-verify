@@ -20,9 +20,13 @@ def build_report(
     evidence_path: str,
     bundle_sha256: str,
     plan_notes: list[dict],
+    mode: str,
+    tool_commit: str,
 ) -> dict:
     return {
         "shadow_verify": __version__,
+        "mode": mode,
+        "tool_commit": tool_commit,
         "summary": summary_counts(results),
         "results": [item.to_dict() for item in results],
         "plan_notes": plan_notes,

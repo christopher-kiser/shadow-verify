@@ -189,6 +189,68 @@ def test_not_assessed_when_access_is_denied():
     stubber.assert_no_pending_responses()
 
 
+def test_superset_cidr_fails_a_narrower_forbid():
+    with mock_aws():
+        group_id = _group(
+            [
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
+                }
+            ]
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(
+            claim(
+                "ec2_security_group",
+                group_id,
+                {
+                    "ingress_forbidden": [
+                        {"protocol": "tcp", "from_port": 22, "to_port": 22, "cidr": "10.0.0.0/8"}
+                    ]
+                },
+            ),
+            aws,
+        )
+    assert result.verdict == Verdict.FAIL, result.reasons
+
+
+def test_two_halves_fail_a_world_forbid():
+    with mock_aws():
+        group_id = _group(
+            [
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "IpRanges": [{"CidrIp": "0.0.0.0/1"}, {"CidrIp": "128.0.0.0/1"}],
+                }
+            ]
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
+    assert result.verdict == Verdict.FAIL, result.reasons
+
+
+def test_narrow_cidr_does_not_cover_the_world():
+    with mock_aws():
+        group_id = _group(
+            [
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "IpRanges": [{"CidrIp": "10.1.0.0/16"}],
+                }
+            ]
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
+    assert result.verdict == Verdict.PASS, result.reasons
+
+
 def test_not_assessed_when_group_does_not_exist():
     with mock_aws():
         aws, _evidence = aws_stack()

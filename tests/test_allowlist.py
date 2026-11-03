@@ -7,7 +7,9 @@ import pytest
 
 from shadow_verify.aws import (
     ALLOWED_OPERATIONS,
+    CLIENT_CONFIG,
     DENIED_OPERATIONS,
+    OPERATION_IAM_ACTIONS,
     BotoAws,
     refusal,
 )
@@ -23,21 +25,42 @@ class BoomClient:
         raise AssertionError(f"client method was called: {name}")
 
 
-def test_secret_and_write_calls_are_refused_before_any_client_call():
-    aws = BotoAws(
-        s3=BoomClient(),
-        ec2=BoomClient(),
-        iam=BoomClient(),
-        evidence=EvidenceLog(),
-    )
-    cases = (
-        ("secretsmanager", "GetSecretValue", {"SecretId": "prod"}),
-        ("s3", "GetObject", {"Bucket": "logs-prod", "Key": "a"}),
-        ("s3", "PutBucketPolicy", {"Bucket": "logs-prod", "Policy": "{}"}),
-    )
-    for service, operation, params in cases:
-        with pytest.raises(ShadowVerifyError, match="refusing"):
-            aws._invoke(service, operation, BoomClient(), **params)
+# Hard-coded. Removing kms:Decrypt from DENIED_OPERATIONS fails this set equality.
+REQUIRED_DENIALS = {
+    "secretsmanager:GetSecretValue",
+    "s3:GetObject",
+    "s3:GetObjectVersion",
+    "ssm:GetParameter",
+    "ssm:GetParameters",
+    "ssm:GetParametersByPath",
+    "ssm:GetParameterHistory",
+    "kms:Decrypt",
+    "dynamodb:GetItem",
+    "dynamodb:BatchGetItem",
+    "dynamodb:Query",
+    "dynamodb:Scan",
+    "dynamodb:ExecuteStatement",
+    "lambda:GetFunction",
+    "ec2:GetPasswordData",
+}
+
+
+def test_deny_list_matches_the_hard_coded_set():
+    assert DENIED_OPERATIONS == REQUIRED_DENIALS
+
+
+@pytest.mark.parametrize("pair", sorted(REQUIRED_DENIALS))
+def test_denied_call_is_refused_before_any_client_call(pair: str):
+    service, operation = pair.split(":", 1)
+    aws = BotoAws(s3=BoomClient(), ec2=BoomClient(), iam=BoomClient(), evidence=EvidenceLog())
+    with pytest.raises(ShadowVerifyError, match="refusing denied"):
+        aws._invoke(service, operation, BoomClient())
+
+
+def test_write_call_is_refused_before_any_client_call():
+    aws = BotoAws(s3=BoomClient(), ec2=BoomClient(), iam=BoomClient(), evidence=EvidenceLog())
+    with pytest.raises(ShadowVerifyError, match="refusing"):
+        aws._invoke("s3", "PutBucketPolicy", BoomClient(), Bucket="logs-prod", Policy="{}")
 
 
 def test_denied_pair_wins_over_an_allowlist_prefix():
@@ -68,7 +91,10 @@ def test_iam_policy_actions_equal_the_allowlist():
             deny.extend(actions)
         else:
             raise AssertionError(statement["Effect"])
-    assert set(allow) == set(ALLOWED_OPERATIONS)
+    assert set(allow) == set(OPERATION_IAM_ACTIONS.values())
+    assert "s3:GetPublicAccessBlock" not in allow
+    assert "s3:GetBucketPublicAccessBlock" in allow
+    assert set(OPERATION_IAM_ACTIONS) == set(ALLOWED_OPERATIONS)
     assert set(deny) == set(DENIED_OPERATIONS)
     assert len(allow) == len(set(allow))
     assert len(deny) == len(set(deny))
@@ -76,6 +102,10 @@ def test_iam_policy_actions_equal_the_allowlist():
     ec2 = by_sid["Ec2DescribeSecurityGroups"]
     assert ec2["Action"] == ["ec2:DescribeSecurityGroups"]
     assert ec2["Resource"] == "*"
+    assert by_sid["S3BucketReads"]["Action"] == [
+        "s3:GetBucketPolicyStatus",
+        "s3:GetBucketPublicAccessBlock",
+    ]
     assert by_sid["S3BucketReads"]["Resource"] == "arn:aws:s3:::*"
     assert by_sid["IamRoleReads"]["Resource"] == "arn:aws:iam::*:role/*"
     assert "arn:aws:iam::*:policy/*" in by_sid["IamPolicyReads"]["Resource"]
@@ -85,6 +115,24 @@ def test_iam_policy_actions_equal_the_allowlist():
         if statement["Effect"] != "Allow":
             continue
         assert statement["Resource"] != "*"
+
+
+def test_client_config_is_applied_by_from_session():
+    seen = []
+
+    class Session:
+        def client(self, name, **kwargs):
+            seen.append(kwargs.get("config"))
+            return object()
+
+    BotoAws.from_session(Session(), "us-east-1", EvidenceLog())
+    assert len(seen) == 3
+    for config in seen:
+        assert config is CLIENT_CONFIG
+        assert config.retries["mode"] == "standard"
+        assert config.retries["max_attempts"] == 3
+        assert config.connect_timeout == 3
+        assert config.read_timeout == 10
 
 
 def test_oidc_trust_policy_pins_audience_and_subject():

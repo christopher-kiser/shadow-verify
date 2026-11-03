@@ -16,14 +16,18 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+import rfc8785
+
 from shadow_verify import __version__
 
-CANONICALIZATION = "json-sort-keys-separators-utf8"
+CANONICALIZATION = "rfc8785"
+_ACCOUNT_ID = re.compile(r"(?<!\d)(\d{12})(?!\d)")
 REDACTED = "***REDACTED***"
 
 # Normalized by lowercasing and dropping non-alphanumeric characters.
@@ -92,13 +96,53 @@ def redact(value: Any) -> Any:
     return value
 
 
+class AccountIdIndex:
+    """Replace AWS account ids with stable labels for one bundle.
+
+    The mapping is not a hash. A per-bundle index cannot be reversed to the
+    account id, and the same id in one run always gets the same label, so
+    two identical runs hash the same. The index itself is not stored.
+    """
+
+    def __init__(self) -> None:
+        self._labels: dict[str, str] = {}
+
+    def rewrite(self, value: Any) -> Any:
+        if isinstance(value, str):
+            return _ACCOUNT_ID.sub(self._replace, value)
+        if isinstance(value, dict):
+            return {key: self.rewrite(item) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self.rewrite(item) for item in value]
+        return value
+
+    def _replace(self, match: re.Match[str]) -> str:
+        account_id = match.group(1)
+        if account_id not in self._labels:
+            self._labels[account_id] = f"account-{len(self._labels) + 1}"
+        return self._labels[account_id]
+
+
+def strip_response_metadata(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: strip_response_metadata(item)
+            for key, item in value.items()
+            if key != "ResponseMetadata"
+        }
+    if isinstance(value, list):
+        return [strip_response_metadata(item) for item in value]
+    return value
+
+
+def canonical_bytes(value: Any) -> bytes:
+    """RFC 8785 JSON. The bytes are what SHA-256 covers."""
+
+    return rfc8785.dumps(value)
+
+
 def canonical_dumps(value: Any) -> str:
-    return json.dumps(
-        value,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    )
+    return canonical_bytes(value).decode("utf-8")
 
 
 def sha256_text(text: str) -> str:
@@ -106,7 +150,7 @@ def sha256_text(text: str) -> str:
 
 
 def sha256_json(value: Any) -> str:
-    return sha256_text(canonical_dumps(value))
+    return hashlib.sha256(canonical_bytes(value)).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -117,14 +161,17 @@ class EvidenceItem:
     params: dict[str, Any]
     body: dict[str, Any]
     sha256: str
+    view: dict[str, Any]
 
     @property
     def ok(self) -> bool:
-        return "response" in self.body
+        return "response" in self.view
 
     @property
     def response(self) -> dict[str, Any]:
-        response = self.body.get("response")
+        """Unredacted response for checkers. The stored body is redacted."""
+
+        response = self.view.get("response")
         if isinstance(response, dict):
             return response
         return {}
@@ -159,6 +206,7 @@ class EvidenceItem:
 class EvidenceLog:
     def __init__(self) -> None:
         self.items: list[EvidenceItem] = []
+        self._accounts = AccountIdIndex()
 
     def record(
         self,
@@ -172,31 +220,36 @@ class EvidenceLog:
         error_response: Any = None,
     ) -> EvidenceItem:
         item_id = f"{service}.{operation}#{len(self.items) + 1}"
-        frozen_params = redact(to_jsonable(params))
+        view_params = strip_response_metadata(to_jsonable(params))
         if error_code is not None:
-            body: dict[str, Any] = {
+            view = {
                 "error": {
                     "code": error_code,
                     "message": (error_message or "")[:500],
-                    "response": redact(to_jsonable(error_response)) if error_response is not None else None,
+                    "response": strip_response_metadata(to_jsonable(error_response))
+                    if error_response is not None
+                    else None,
                 }
             }
         else:
-            body = {"response": redact(to_jsonable(response))}
+            view = {"response": strip_response_metadata(to_jsonable(response))}
+        stored_params = self._accounts.rewrite(redact(view_params))
+        stored_body = self._accounts.rewrite(redact(view))
         payload = {
             "id": item_id,
             "service": service,
             "operation": operation,
-            "params": frozen_params,
-            "body": body,
+            "params": stored_params,
+            "body": stored_body,
         }
         item = EvidenceItem(
             id=item_id,
             service=service,
             operation=operation,
-            params=frozen_params,
-            body=body,
+            params=stored_params,
+            body=stored_body,
             sha256=sha256_json(payload),
+            view=view,
         )
         self.items.append(item)
         return item
@@ -210,9 +263,13 @@ class EvidenceLog:
         region: str,
         results: list[dict[str, Any]],
         plan_notes: list[dict[str, Any]],
+        mode: str,
+        tool_commit: str,
     ) -> dict[str, Any]:
         document: dict[str, Any] = {
             "shadow_verify": __version__,
+            "mode": mode,
+            "tool_commit": tool_commit,
             "generated_at": generated_at,
             "claims_file": claims_file,
             "claims_sha256": claims_sha256,
@@ -220,8 +277,8 @@ class EvidenceLog:
             "hash_algorithm": "sha256",
             "canonicalization": CANONICALIZATION,
             "items": [item.as_dict() for item in self.items],
-            "results": results,
-            "plan_notes": plan_notes,
+            "results": self._accounts.rewrite(results),
+            "plan_notes": self._accounts.rewrite(plan_notes),
             "rules": {
                 "agent_note": "untrusted; never an input to the verdict",
                 "plan_notes": "informational in v0; never an input to the verdict",

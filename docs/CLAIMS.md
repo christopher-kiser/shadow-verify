@@ -36,7 +36,7 @@ An unknown `resource_type` is NOT ASSESSED. It is not a pass. Register a checker
 
 ## Units
 
-Booleans are `true` or `false`. Ports are integers from 0 through 65535. CIDRs, principals, and policy ARNs are exact strings. `0.0.0.0/0` does not imply `::/0`. There is no unit conversion and no "close enough".
+Booleans are `true` or `false`. Ports are integers from 0 through 65535. Principals and policy ARNs are exact strings. A security-group forbid fails when the union of matching ingress CIDRs covers that network, including a wider prefix or several narrower ones. `0.0.0.0/0` does not imply `::/0`.
 
 ## `s3_bucket`
 
@@ -77,7 +77,7 @@ A permission covers a forbidden rule when all of these hold:
 
 - its protocol is `-1`, or it equals the forbidden protocol (a forbidden protocol of `-1` matches only an all-protocol permission)
 - its port range overlaps the forbidden range (an all-protocol permission covers every port)
-- `CidrIp` or `CidrIpv6` equals the forbidden CIDR string
+- the union of its `CidrIp` or `CidrIpv6` values, for the same IP version, covers the forbidden network (a wider prefix, or several narrower ones together)
 
 Security-group sources and prefix lists are not CIDRs. A permission that matches the protocol and CIDR but has no ports is NOT ASSESSED.
 

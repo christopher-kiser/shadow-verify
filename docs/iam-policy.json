@@ -14,7 +14,7 @@
       "Effect": "Allow",
       "Action": [
         "s3:GetBucketPolicyStatus",
-        "s3:GetPublicAccessBlock"
+        "s3:GetBucketPublicAccessBlock"
       ],
       "Resource": "arn:aws:s3:::*"
     },
@@ -51,10 +51,15 @@
         "ec2:GetPasswordData",
         "kms:Decrypt",
         "lambda:GetFunction",
+        "dynamodb:BatchGetItem",
+        "dynamodb:ExecuteStatement",
         "s3:GetObject",
+        "s3:GetObjectVersion",
         "secretsmanager:GetSecretValue",
         "ssm:GetParameter",
-        "ssm:GetParameters"
+        "ssm:GetParameterHistory",
+        "ssm:GetParameters",
+        "ssm:GetParametersByPath"
       ],
       "Resource": "*"
     }

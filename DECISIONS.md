@@ -18,11 +18,7 @@
 
 ## ADR 003 — 2026-11-03 — Exit codes
 
-**Decision.** Exit 1 on any FAIL. Exit 2 on a bad claims file, a bad plan file, or a bad profile. Exit 0 when every claim is PASS or NOT ASSESSED. `--fail-on-not-assessed` also exits 1 on NOT ASSESSED. The GitHub Action defaults that flag to true.
-
-**Reason.** The CLI spec is "non-zero on any FAIL". A local run that cannot read one optional property should still show the passes. A CI job that never reached AWS should not look green, so the action is stricter.
-
-**Revisit when.** Users want NOT ASSESSED to fail the CLI by default.
+Superseded by ADR 021. The old rule exited 0 when every claim was PASS or NOT ASSESSED, and used exit 2 for a bad claims file.
 
 ## ADR 004 — 2026-11-03 — Unknown resource types are NOT ASSESSED
 
@@ -50,7 +46,7 @@
 
 ## ADR 007 — 2026-11-03 — Security group coverage is exact and one-directional
 
-**Decision.** CIDR match is an exact string. Port ranges overlap. A permission with protocol `-1` covers any forbidden protocol and every port. A forbidden protocol of `-1` matches only an all-protocol permission. `0.0.0.0/0` does not imply `::/0`. Security-group and prefix-list sources do not satisfy a CIDR forbid. A matching permission with no ports is NOT ASSESSED.
+**Decision.** Superseded for CIDR coverage by ADR 018. Port ranges still overlap. A permission with protocol `-1` covers any forbidden protocol and every port. A forbidden protocol of `-1` matches only an all-protocol permission. `0.0.0.0/0` does not imply `::/0`. Security-group and prefix-list sources are not CIDRs. A matching permission with no ports is NOT ASSESSED.
 
 **Reason.** These are the rules we can apply without guessing what "open" means. The claim lists the forbids. The checker does not invent a least-privilege judgment.
 
@@ -114,9 +110,9 @@
 
 ## ADR 015 — 2026-11-03 — GitHub Action is stricter than the CLI
 
-**Decision.** `fail-on-not-assessed` defaults to true in `action.yml` and false in the CLI. The action assumes a role only when `role-to-assume` is set, installs this package from `github.action_path`, and writes a job summary.
+**Decision.** NOT ASSESSED is exit 2, so the action does not need a separate flag. The action assumes a role only when `role-to-assume` is set, installs this package from `github.action_path`, and writes a job summary.
 
-**Reason.** Local exploration should show NOT ASSESSED without failing the process. A deployed-account check that could not read AWS should fail the job.
+**Reason.** A deployed-account check that could not read AWS should fail the job. Exit 2 does that without a second switch.
 
 **Revisit when.** The action is split into a report-only mode for workflows that cannot assume the role.
 
@@ -135,3 +131,35 @@
 **Reason.** A broad `ReadOnlyAccess` role and an unpinned GitHub subject would let this checker, or a fork workflow, read more than the claims require.
 
 **Revisit when.** The claims file is known ahead of time and the role can be limited to those exact ARNs, or deploys move to a GitHub environment subject.
+
+## ADR 018 — 2026-11-03 — Security group CIDRs use coverage, not string equality
+
+**Decision.** A forbidden CIDR fails when the union of matching ingress CIDRs of the same IP version covers that network. One wider prefix is a cover. Two halves that together contain the target are a cover. `ipaddress` does the arithmetic. Supersedes the exact-string rule in ADR 007.
+
+**Reason.** An exact string match lets `0.0.0.0/0` pass a forbid of `10.0.0.0/8`, and lets `0.0.0.0/1` plus `128.0.0.0/1` pass a forbid of `0.0.0.0/0`.
+
+**Revisit when.** Prefix lists or security-group sources need to count as coverage. v0 still ignores them.
+
+## ADR 019 — 2026-11-03 — RFC 8785 canonical JSON
+
+**Decision.** Evidence hashes use `rfc8785==0.1.4`. `ResponseMetadata` is removed before the bytes are hashed.
+
+**Reason.** A hand-rolled `json.dumps` is close to canonical JSON but not a named standard. `ResponseMetadata` carries `RequestId` and the HTTP date, so two runs with a fixed clock still hashed differently.
+
+**Revisit when.** The package is unmaintained or a later RFC replaces 8785.
+
+## ADR 020 — 2026-11-03 — Account ids are indexed, not hashed
+
+**Decision.** Twelve-digit account ids in the stored bundle are replaced with `account-1`, `account-2`, and so on, in first-seen order for that bundle. The index is not stored. Checkers still see the original response, so the verdict does not change. Account ids are not passed through SHA-256.
+
+**Reason.** A plain SHA-256 of an account id is reversible with a 10^12 dictionary. An HMAC with an unstored salt would also make identical runs hash differently, which fights ADR 019.
+
+**Revisit when.** A reviewer needs to recover the account id from a bundle. That requires storing a key, which this decision refuses.
+
+## ADR 021 — 2026-11-03 — Exit codes
+
+**Decision.** Supersedes ADR 003. `run` exits 0 when every claim is PASS, 1 when any claim is FAIL, 2 when there is no FAIL and at least one claim is NOT ASSESSED, and 3 on a bad file, a bad profile, or an unexpected crash. `verify` exits 0 when the hashes match and 3 otherwise. FAIL still outranks NOT ASSESSED.
+
+**Reason.** Exit 0 for NOT ASSESSED hid a check that never read AWS. An uncaught crash was easy to confuse with a claim FAIL.
+
+**Revisit when.** A caller needs the old exit-0-on-not-assessed behavior. That would be a separate flag, not the default.

@@ -4,18 +4,23 @@ Subcommands:
   run     Compare claims to AWS. Accepts an injected boto3 Session and clock.
   verify  Recompute evidence hashes.
 
-Exit codes:
-  0  run: no FAIL. verify: hashes match.
-  1  run: any FAIL, or any NOT ASSESSED when --fail-on-not-assessed is set.
-     verify: a hash does not match.
-  2  The claims file, plan file, or invocation is invalid.
+Exit codes for ``run``:
+  0  every claim is PASS
+  1  any claim is FAIL (FAIL outranks NOT ASSESSED)
+  2  no FAIL, and at least one claim is NOT ASSESSED
+  3  the claims file, plan, profile, or an unexpected crash
+
+``verify`` exits 0 when the hashes match and 3 otherwise.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
+import traceback
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,8 +45,32 @@ def system_clock() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class _Parser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        self.print_usage(sys.stderr)
+        self.exit(3, f"error: {message}\n")
+
+
+def _tool_commit() -> str:
+    override = os.environ.get("SV_TOOL_COMMIT")
+    if override:
+        return override
+    try:
+        completed = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=Path(__file__).resolve().parents[2],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    sha = completed.stdout.strip()
+    return sha or "unknown"
+
+
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+    parser = _Parser(
         prog="shadow-verify",
         description=(
             "Compare explicit AWS claims to live read-only account state. "
@@ -74,9 +103,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional terraform show -json file. Informational in v0; does not change verdicts.",
     )
     run_parser.add_argument(
-        "--fail-on-not-assessed",
-        action="store_true",
-        help="Exit 1 when any claim is NOT ASSESSED. Default: exit 1 only on FAIL.",
+        "--mode",
+        choices=("MOCKED", "LIVE"),
+        default="LIVE",
+        help="Record whether this run used mocks or a live account (default: LIVE).",
     )
 
     verify_parser = commands.add_parser("verify", help="Check an evidence bundle's hashes")
@@ -85,7 +115,13 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> None:
-    sys.exit(run(argv))
+    try:
+        sys.exit(run(argv))
+    except SystemExit:
+        raise
+    except Exception:
+        traceback.print_exc()
+        sys.exit(3)
 
 
 def run(
@@ -109,7 +145,10 @@ def run(
         return _run_claims(args, session=session, clock=clock or system_clock)
     except ShadowVerifyError as exc:
         print(f"error: {exc}", file=sys.stderr)
-        return 2
+        return 3
+    except Exception:
+        traceback.print_exc()
+        return 3
 
 
 def _verify(path: Path) -> int:
@@ -117,19 +156,19 @@ def _verify(path: Path) -> int:
         bundle = json.loads(path.read_text(encoding="utf-8"))
     except OSError as exc:
         print(f"error: cannot read evidence file: {exc}", file=sys.stderr)
-        return 2
+        return 3
     except json.JSONDecodeError as exc:
         print(f"error: evidence file is not JSON: {exc}", file=sys.stderr)
-        return 2
+        return 3
     if not isinstance(bundle, dict):
         print("error: evidence file must be a JSON object", file=sys.stderr)
-        return 2
+        return 3
     problems = bundle_problems(bundle)
     if problems:
         print("evidence bundle hash check failed:", file=sys.stderr)
         for problem in problems:
             print(f"- {problem}", file=sys.stderr)
-        return 1
+        return 3
     print(f"evidence bundle ok: {bundle.get('bundle_sha256')}")
     return 0
 
@@ -147,7 +186,7 @@ def _run_claims(args: argparse.Namespace, *, session, clock: Clock) -> int:
             session = boto3.Session(**session_kwargs)
         except ProfileNotFound as exc:
             print(f"error: {exc}", file=sys.stderr)
-            return 2
+            return 3
     evidence = EvidenceLog()
     aws = BotoAws.from_session(session, args.region, evidence)
     results = run_checks(claims, aws)
@@ -162,6 +201,8 @@ def _run_claims(args: argparse.Namespace, *, session, clock: Clock) -> int:
         region=args.region,
         results=result_dicts,
         plan_notes=notes,
+        mode=args.mode,
+        tool_commit=_tool_commit(),
     )
     evidence_path = Path(args.evidence)
     evidence_path.parent.mkdir(parents=True, exist_ok=True)
@@ -174,6 +215,8 @@ def _run_claims(args: argparse.Namespace, *, session, clock: Clock) -> int:
         evidence_path=args.evidence,
         bundle_sha256=bundle["bundle_sha256"],
         plan_notes=notes,
+        mode=args.mode,
+        tool_commit=bundle["tool_commit"],
     )
     if args.json_output:
         json.dump(report, sys.stdout, indent=2, ensure_ascii=False)
@@ -182,6 +225,6 @@ def _run_claims(args: argparse.Namespace, *, session, clock: Clock) -> int:
         sys.stdout.write(render_human(report))
     if any(item.verdict == Verdict.FAIL for item in results):
         return 1
-    if args.fail_on_not_assessed and any(item.verdict == Verdict.NOT_ASSESSED for item in results):
-        return 1
+    if any(item.verdict == Verdict.NOT_ASSESSED for item in results):
+        return 2
     return 0
