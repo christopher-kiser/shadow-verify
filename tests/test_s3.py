@@ -177,6 +177,25 @@ def test_throttling_is_not_assessed():
     stubber.assert_no_pending_responses()
 
 
+def test_timeout_is_not_assessed():
+    s3 = boto3.client("s3", region_name=REGION)
+    stubber = Stubber(s3)
+    stubber.add_client_error(
+        "get_public_access_block",
+        service_error_code="RequestTimeout",
+        service_message="timed out",
+        expected_params={"Bucket": "logs"},
+    )
+    stubber.activate()
+    aws, _evidence = aws_stack()
+    aws._s3 = s3
+    result = CHECKER.check(claim("s3_bucket", "logs", {"block_public_acls": True}), aws)
+    assert result.verdict == Verdict.NOT_ASSESSED
+    assert result.verdict != Verdict.PASS
+    assert any("RequestTimeout" in reason for reason in result.reasons)
+    stubber.assert_no_pending_responses()
+
+
 def test_missing_credentials_are_not_assessed():
     from botocore.exceptions import NoCredentialsError
 

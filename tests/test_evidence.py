@@ -81,3 +81,35 @@ def test_non_finite_float_is_rejected():
 
 def test_sha256_text_is_hashlib():
     assert sha256_text("shadow") == hashlib.sha256(b"shadow").hexdigest()
+
+
+def test_golden_bundle_hash_redacts_before_hashing():
+    """MOCKED fixture. Clock and response are fixed; the digest is golden."""
+
+    log = EvidenceLog()
+    log.record(
+        "s3",
+        "GetPublicAccessBlock",
+        {"Bucket": "logs-prod"},
+        response={
+            "PublicAccessBlockConfiguration": {"BlockPublicPolicy": False},
+            "SecretString": "super-secret",
+        },
+    )
+    bundle = log.bundle(
+        generated_at="2026-11-03T06:00:00+00:00",
+        claims_file="claims.json",
+        claims_sha256="abc",
+        region="us-east-1",
+        results=[],
+        plan_notes=[],
+    )
+    encoded = json.dumps(bundle)
+    assert "super-secret" not in encoded
+    assert bundle["items"][0]["body"]["response"]["SecretString"] == "***REDACTED***"
+    assert bundle["items"][0]["sha256"] == "142a208972e8972dcd61c7384b02d26c4cd54afc3bf6a700c13f9444955e15ec"
+    assert bundle["bundle_sha256"] == "0776dc13b72dd0ed35d6b6a2b5014231ef7bc0ff0d51007a8931f6a6dbc36e8d"
+    assert bundle_problems(bundle) == []
+    assert sha256_text(canonical_dumps({"a": 1}).encode("utf-8").decode("utf-8")) == (
+        "015abd7f5cc57a2dd94b7590f04ad8084273905ee33ec5cebeae62276a97f862"
+    )

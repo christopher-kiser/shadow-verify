@@ -6,7 +6,6 @@ from moto import mock_aws
 from shadow_verify.aws import ALLOWED_OPERATIONS, BotoAws
 from shadow_verify.checkers import CHECKERS, get_checker, register
 from shadow_verify.engine import run_checks
-from shadow_verify.errors import ShadowVerifyError
 from shadow_verify.evidence import EvidenceLog
 from shadow_verify.models import CheckResult, Verdict
 from shadow_verify.terraform import plan_notes, read_plan
@@ -55,16 +54,22 @@ def test_plan_missing_address_is_reported(tmp_path):
     assert notes[0]["status"] == "not_found"
 
 
-def test_allowlist_is_read_only():
-    for service, operation in ALLOWED_OPERATIONS:
-        assert operation.startswith(("Get", "List", "Describe")), (service, operation)
-    aws = BotoAws(s3=object(), ec2=object(), iam=object(), evidence=EvidenceLog())
-    try:
-        aws._invoke("s3", "PutObject", aws._s3, Bucket="logs")
-    except ShadowVerifyError as exc:
-        assert "refusing" in str(exc)
-    else:
-        raise AssertionError("write call was not refused")
+def test_allowlist_is_exact_pairs_not_verb_prefixes():
+    assert ALLOWED_OPERATIONS == {
+        "s3:GetPublicAccessBlock",
+        "s3:GetBucketPolicyStatus",
+        "ec2:DescribeSecurityGroups",
+        "iam:GetRole",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListRolePolicies",
+        "iam:GetRolePolicy",
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion",
+    }
+    for pair in ALLOWED_OPERATIONS:
+        service, operation = pair.split(":", 1)
+        assert service and operation
+        assert "*" not in pair
 
 
 def test_custom_checker_can_be_registered():

@@ -1,0 +1,38 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ShadowVerifyAllowlist",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeSecurityGroups",
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion",
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListRolePolicies",
+        "s3:GetBucketPolicyStatus",
+        "s3:GetPublicAccessBlock"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyDataAndSecretReads",
+      "Effect": "Deny",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "ec2:GetPasswordData",
+        "kms:Decrypt",
+        "lambda:GetFunction",
+        "s3:GetObject",
+        "secretsmanager:GetSecretValue",
+        "ssm:GetParameter",
+        "ssm:GetParameters"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

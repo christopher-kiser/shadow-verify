@@ -1,39 +1,13 @@
 # IAM policy
 
-Shadow Verify calls only the operations in `ALLOWED_OPERATIONS` (`src/shadow_verify/aws.py`). The client refuses any other operation before it is sent. The role you assume should allow the same set and nothing that writes.
+The policy file is [iam-policy.json](iam-policy.json). A test checks that its Allow actions are exactly `ALLOWED_OPERATIONS` and its Deny actions are exactly `DENIED_OPERATIONS` in `src/shadow_verify/aws.py`.
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "ShadowVerifyReadOnly",
-      "Effect": "Allow",
-      "Action": [
-        "s3:GetPublicAccessBlock",
-        "s3:GetBucketPolicyStatus",
-        "ec2:DescribeSecurityGroups",
-        "iam:GetRole",
-        "iam:ListAttachedRolePolicies",
-        "iam:ListRolePolicies",
-        "iam:GetRolePolicy",
-        "iam:GetPolicy",
-        "iam:GetPolicyVersion"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
+Allow actions are the `service:Operation` pairs the client actually calls. There is no `s3:Get*`, no `iam:Get*`, and no AWS managed `ReadOnlyAccess` policy. v0 does not call `s3:GetBucketPolicy`. Publicity comes from `GetBucketPolicyStatus`.
 
-v0 does not call `s3:GetBucketPolicy`. Publicity comes from `GetBucketPolicyStatus`.
+Deny actions are data and secret reads: `secretsmanager:GetSecretValue`, `s3:GetObject`, `ssm:GetParameter`, `ssm:GetParameters`, `kms:Decrypt`, `dynamodb:GetItem`, `dynamodb:Query`, `dynamodb:Scan`, `lambda:GetFunction`, and `ec2:GetPasswordData`. The client refuses those, and any other call that is not on the allowlist, before it looks up a boto3 method. A write such as `s3:PutBucketPolicy` is refused the same way.
 
-`Resource` is `*` because `DescribeSecurityGroups` and the IAM read actions are awkward to scope until the claim file is known. You can tighten this later:
+`Resource` is `*` because a generic role cannot name every bucket, security group, and role until the claims file is known. Action strings themselves contain no wildcards. You can tighten `Resource` later to the ARNs named in a specific claims file.
 
-- S3 actions to `arn:aws:s3:::bucket-name`
-- `iam:GetRole`, `iam:ListAttachedRolePolicies`, `iam:ListRolePolicies`, and `iam:GetRolePolicy` to the role ARNs under review
-- `iam:GetPolicy` and `iam:GetPolicyVersion` to the policy ARNs named in the claims
+The GitHub Action assumes a role with GitHub OIDC (`sts:AssumeRoleWithWebIdentity`). The example workflow is `examples/github-workflow.yml`. The CLI uses the session you pass in, or the ambient AWS credential chain. It does not assume a role itself.
 
-Do not attach this policy to a role that also has write access if you can avoid it. The GitHub Action assumes a role with GitHub OIDC (`sts:AssumeRoleWithWebIdentity`). The example workflow is `examples/github-workflow.yml`. The CLI itself does not assume a role; it uses the ambient AWS credential chain (`AWS_ACCESS_KEY_ID`, a profile, or the OIDC credentials the action exports).
-
-Access denied, missing credentials, and throttling become NOT ASSESSED. They are not a FAIL, and they are not a PASS.
+Access denied, throttling, timeouts, truncated pagination, and an unsupported resource type are NOT ASSESSED. They are not a FAIL, and they are not a PASS.

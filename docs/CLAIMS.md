@@ -32,7 +32,7 @@ claims:
 | `agent_note` | no | Untrusted model text. Recorded. Never an input to the verdict. |
 | `terraform_address` | no | Optional address in a `terraform show -json` plan. Informational in v0. |
 
-An unknown `resource_type` is a claims error (exit 2), not a pass. Register a checker before referring to a new type. See `AGENTS.md`.
+An unknown `resource_type` is NOT ASSESSED. It is not a pass. Register a checker before a new type can pass. See `AGENTS.md`.
 
 ## Units
 

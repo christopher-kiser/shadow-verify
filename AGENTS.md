@@ -9,9 +9,9 @@ Shadow Verify checks live AWS state against explicit claims. Verdicts are determ
 - NOT ASSESSED when evidence is missing, denied, throttled, or not understood. Never guess a PASS, and never turn an API error into a FAIL.
 - `agent_note`, pull request text, and any other model output are untrusted. They are not inputs to a verdict.
 - Terraform plan notes are informational in v0. They must not change a verdict until a decision in `DECISIONS.md` says they do.
-- AWS calls go through `shadow_verify.aws.BotoAws` and must stay on `ALLOWED_OPERATIONS`. Add a read-only action to the allowlist and to `docs/IAM.md` together, with a test.
+- AWS calls go through `shadow_verify.aws.BotoAws`. Add a pair to `ALLOWED_OPERATIONS` and to `docs/iam-policy.json` together. Do not add `DENIED_OPERATIONS` to the allowlist. The refusal runs before any client method.
 - Keep the runtime dependency set at boto3 plus the standard library.
-- Windows must keep working. Use `pathlib`. Do not shell out to bash or rely on POSIX paths. Give PowerShell commands when you change the quickstart.
+- Use `pathlib` and `encoding="utf-8"` for file IO. Do not claim Windows support unless `STATUS.md` records a test run on Windows.
 - A new checker needs PASS, FAIL, and NOT ASSESSED tests that use moto or botocore Stubber.
 
 ## Layout
@@ -28,7 +28,8 @@ Shadow Verify checks live AWS state against explicit claims. Verdicts are determ
 | `src/shadow_verify/checkers/` | One module per resource type. Register in `__init__.py` |
 | `src/shadow_verify/terraform.py` | Plan notes. The v0 limit is a TODO in that file |
 | `docs/CLAIMS.md` | User-facing claim schema |
-| `docs/IAM.md` | The policy that matches the allowlist |
+| `docs/iam-policy.json` | Allow and deny actions. Must match the code lists |
+| `docs/IAM.md` | What that policy means |
 | `examples/demo/run_demo.py` | Offline false-"done" demo |
 | `action.yml` | Composite GitHub Action |
 | `tests/` | pytest |

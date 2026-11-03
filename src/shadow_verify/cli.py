@@ -1,10 +1,22 @@
-"""Command line entry point."""
+"""Command line entry point.
+
+Subcommands:
+  run     Compare claims to AWS. Accepts an injected boto3 Session and clock.
+  verify  Recompute evidence hashes.
+
+Exit codes:
+  0  run: no FAIL. verify: hashes match.
+  1  run: any FAIL, or any NOT ASSESSED when --fail-on-not-assessed is set.
+     verify: a hash does not match.
+  2  The claims file, plan file, or invocation is invalid.
+"""
 
 from __future__ import annotations
 
 import argparse
 import json
 import sys
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -21,45 +33,54 @@ from shadow_verify.models import Verdict
 from shadow_verify.report import build_report, render_human
 from shadow_verify.terraform import plan_notes, read_plan
 
+Clock = Callable[[], datetime]
+
+
+def system_clock() -> datetime:
+    return datetime.now(timezone.utc)
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="shadow-verify",
         description=(
             "Compare explicit AWS claims to live read-only account state. "
-            "Verdicts are PASS, FAIL, or NOT ASSESSED. Rules only; model text cannot grant PASS."
+            "PASS only when every assertion was read and matched. "
+            "Precedence is FAIL, then NOT ASSESSED, then PASS. "
+            "Model text cannot grant PASS."
         ),
     )
     parser.add_argument("--version", action="version", version=f"shadow-verify {__version__}")
-    parser.add_argument("--claims", help="Path to a claims YAML or JSON file")
-    parser.add_argument("--region", default="us-east-1", help="AWS region (default: us-east-1)")
-    parser.add_argument("--profile", default=None, help="Optional AWS shared-config profile")
-    parser.add_argument(
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    run_parser = commands.add_parser("run", help="Check claims against live AWS state")
+    run_parser.add_argument("--claims", required=True, help="Path to a claims YAML or JSON file")
+    run_parser.add_argument("--region", default="us-east-1", help="AWS region (default: us-east-1)")
+    run_parser.add_argument("--profile", default=None, help="Optional AWS shared-config profile")
+    run_parser.add_argument(
         "--evidence",
         default="shadow-verify-evidence.json",
         help="Where to write the evidence bundle (default: shadow-verify-evidence.json)",
     )
-    parser.add_argument(
+    run_parser.add_argument(
         "--json",
         action="store_true",
         dest="json_output",
         help="Write the machine-readable report to stdout",
     )
-    parser.add_argument(
+    run_parser.add_argument(
         "--plan",
         default=None,
         help="Optional terraform show -json file. Informational in v0; does not change verdicts.",
     )
-    parser.add_argument(
+    run_parser.add_argument(
         "--fail-on-not-assessed",
         action="store_true",
         help="Exit 1 when any claim is NOT ASSESSED. Default: exit 1 only on FAIL.",
     )
-    parser.add_argument(
-        "--verify-evidence",
-        default=None,
-        help="Check an evidence bundle's item and bundle hashes, then exit",
-    )
+
+    verify_parser = commands.add_parser("verify", help="Check an evidence bundle's hashes")
+    verify_parser.add_argument("evidence", help="Path to an evidence bundle JSON file")
     return parser
 
 
@@ -67,15 +88,25 @@ def main(argv: list[str] | None = None) -> None:
     sys.exit(run(argv))
 
 
-def run(argv: list[str] | None = None) -> int:
+def run(
+    argv: list[str] | None = None,
+    *,
+    session=None,
+    clock: Clock | None = None,
+) -> int:
+    """Run the CLI.
+
+    session: a boto3.Session, or any object with client(service, region_name=).
+    When omitted, a session is built from --profile and --region.
+    clock: callable returning an aware datetime. Tests inject a fixed clock.
+    """
+
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
-        if args.verify_evidence:
-            return _verify(Path(args.verify_evidence))
-        if not args.claims:
-            parser.error("--claims is required unless --verify-evidence is set")
-        return _verify_claims(args)
+        if args.command == "verify":
+            return _verify(Path(args.evidence))
+        return _run_claims(args, session=session, clock=clock or system_clock)
     except ShadowVerifyError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -103,25 +134,29 @@ def _verify(path: Path) -> int:
     return 0
 
 
-def _verify_claims(args: argparse.Namespace) -> int:
+def _run_claims(args: argparse.Namespace, *, session, clock: Clock) -> int:
     claims_path = Path(args.claims)
     claims, claims_sha256 = load_claims_file(claims_path)
     plan = read_plan(Path(args.plan)) if args.plan else None
     notes = plan_notes(claims, plan)
-    session_kwargs: dict = {"region_name": args.region}
-    if args.profile:
-        session_kwargs["profile_name"] = args.profile
-    try:
-        session = boto3.Session(**session_kwargs)
-    except ProfileNotFound as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 2
+    if session is None:
+        session_kwargs: dict = {"region_name": args.region}
+        if args.profile:
+            session_kwargs["profile_name"] = args.profile
+        try:
+            session = boto3.Session(**session_kwargs)
+        except ProfileNotFound as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
     evidence = EvidenceLog()
     aws = BotoAws.from_session(session, args.region, evidence)
     results = run_checks(claims, aws)
     result_dicts = [item.to_dict() for item in results]
+    moment = clock()
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
     bundle = evidence.bundle(
-        generated_at=datetime.now(timezone.utc).isoformat(),
+        generated_at=moment.isoformat(),
         claims_file=args.claims,
         claims_sha256=claims_sha256,
         region=args.region,

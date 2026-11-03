@@ -1,4 +1,4 @@
-"""Load a claims file. Unknown fields and unknown checkers are errors, not passes."""
+"""Load a claims file. Unknown fields are errors. Unknown checkers are not passes."""
 
 from __future__ import annotations
 
@@ -6,7 +6,6 @@ import hashlib
 import json
 from pathlib import Path
 
-from shadow_verify.checkers import get_checker, known_resource_types
 from shadow_verify.errors import ClaimsError
 from shadow_verify.models import Claim
 from shadow_verify.yaml_subset import load_yaml_subset
@@ -85,11 +84,6 @@ def _parse_claim(entry: object, seen: set[str]) -> Claim:
     resource_type = entry.get("resource_type")
     if not isinstance(resource_type, str) or not resource_type:
         raise ClaimsError(f"claim {claim_id!r} resource_type must be a string")
-    if get_checker(resource_type) is None:
-        known = ", ".join(known_resource_types())
-        raise ClaimsError(
-            f"claim {claim_id!r} has no checker for resource_type {resource_type!r}. Known: {known}"
-        )
     identifier = entry.get("identifier")
     if not isinstance(identifier, str) or not identifier.strip():
         raise ClaimsError(f"claim {claim_id!r} identifier must be a non-empty string")

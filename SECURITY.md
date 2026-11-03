@@ -4,13 +4,13 @@ Shadow Verify is a read-only checker. It is not a scanner you point at accounts 
 
 ## What it is allowed to do
 
-The AWS client allowlist is `Get`, `List`, and `Describe` operations in `src/shadow_verify/aws.py`. A call outside that set is refused before it is sent. Use the policy in `docs/IAM.md` for the role the tool assumes. Prefer a role that has no write actions.
+The AWS client allowlist is the exact `service:Operation` set in `src/shadow_verify/aws.py`. A separate deny list blocks secret and data reads, including `secretsmanager:GetSecretValue` and `s3:GetObject`, even if they are later added to the allowlist. Both checks run before a boto3 method is resolved. The same actions are in `docs/iam-policy.json`. Prefer a role that has no write actions.
 
 Credentials come from the AWS SDK chain or from GitHub OIDC in the composite action. The tool does not write access keys to the evidence bundle. Do not pass keys on the command line.
 
 ## Evidence bundles
 
-Bundles contain the API responses used for the verdict. That can include account ids, role ARNs, and IAM policy documents. Treat them as sensitive. Do not commit bundles from a real account. v0 hashes the bundle. It does not sign it. `--verify-evidence` checks that the file still matches its own digests. A digest copied to a pull request comment is what makes a later edit visible.
+Bundles contain the API responses used for the verdict. That can include account ids, role ARNs, and IAM policy documents. Treat them as sensitive. Do not commit bundles from a real account. v0 hashes the bundle after redacting secret-bearing fields. It does not sign it. `shadow-verify verify` checks that the file still matches its own digests. A digest copied to a pull request comment is what makes a later edit visible.
 
 ## GitHub Action
 

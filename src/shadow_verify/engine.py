@@ -19,7 +19,9 @@ def run_checks(claims: list[Claim], aws: BotoAws) -> list[CheckResult]:
                     resource_type=claim.resource_type,
                     identifier=claim.identifier,
                     verdict=Verdict.NOT_ASSESSED,
-                    reasons=(f"no checker registered for {claim.resource_type}",),
+                    reasons=(
+                        f"unsupported resource_type {claim.resource_type}; no checker is registered",
+                    ),
                     evidence_item_ids=(),
                     agent_note=claim.agent_note,
                 )

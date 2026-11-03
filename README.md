@@ -10,20 +10,7 @@ v0 checks three things: S3 public access block and bucket-policy publicity, EC2 
 
 ## 60-second quickstart
 
-No AWS account is required. The demo builds a bucket in [moto](https://github.com/getmoto/moto) where one public-access flag is false, then runs the claim an agent would write after saying the bucket was locked down. The process exits 1 because the false claim was caught.
-
-PowerShell:
-
-```powershell
-git clone https://github.com/christopher-kiser/shadow-verify.git
-cd shadow-verify
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
-python examples\demo\run_demo.py
-```
-
-bash:
+No AWS account is required. The demo is mocked with [moto](https://github.com/getmoto/moto): one public-access flag is false, and the claim says the bucket was locked down. The process exits 1 because that claim is FAIL.
 
 ```bash
 git clone https://github.com/christopher-kiser/shadow-verify.git
@@ -34,37 +21,45 @@ python -m pip install -e ".[dev]"
 python examples/demo/run_demo.py
 ```
 
-Against a real account, put claims in `.shadow/claims.yaml` (see [docs/CLAIMS.md](docs/CLAIMS.md)) and use a role limited to the [read-only policy](docs/IAM.md):
-
-```powershell
-shadow-verify --claims .shadow\claims.yaml --region us-east-1 --evidence evidence.json
-shadow-verify --claims .shadow\claims.yaml --region us-east-1 --json
-```
+Against a real account, put claims in `.shadow/claims.yaml` (see [docs/CLAIMS.md](docs/CLAIMS.md)) and use a role limited to [docs/iam-policy.json](docs/iam-policy.json):
 
 ```bash
-shadow-verify --claims .shadow/claims.yaml --region us-east-1 --evidence evidence.json
+shadow-verify run --claims .shadow/claims.yaml --region us-east-1 --evidence evidence.json
+shadow-verify run --claims .shadow/claims.yaml --region us-east-1 --json
 ```
 
-Exit 0 when nothing failed. Exit 1 when any claim is FAIL. Exit 2 when the claims file or the invocation is invalid. NOT ASSESSED stays exit 0 unless you pass `--fail-on-not-assessed`. The GitHub Action turns that flag on so a job that cannot read AWS is not green.
+`python -m shadow_verify` is the same console entry point.
 
-`python -m shadow_verify` is the same entry point and is the reliable command on Windows if the `shadow-verify` script is not on `PATH`.
+These commands were run on Linux. Windows is not a tested target for v0.
+
+## Exit codes
+
+| Code | `run` | `verify` |
+| --- | --- | --- |
+| 0 | No claim is FAIL. NOT ASSESSED is included unless `--fail-on-not-assessed` is set. | Item and bundle hashes match. |
+| 1 | Any claim is FAIL. Also any NOT ASSESSED when `--fail-on-not-assessed` is set. | A hash does not match. |
+| 2 | The claims file, plan file, or invocation is invalid. | The bundle cannot be read as JSON. |
+
+The GitHub Action sets `--fail-on-not-assessed`, so a job that cannot read AWS is not green.
 
 ## Verdicts
+
+Precedence is **FAIL**, then **NOT ASSESSED**, then **PASS**.
 
 | Verdict | Meaning |
 | --- | --- |
 | PASS | Every requested property was read and matched the claim. |
 | FAIL | A read value contradicts the claim. One contradiction is enough, even if another call was denied. |
-| NOT ASSESSED | Evidence is missing, denied, throttled, or not understood. The tool does not guess. |
+| NOT ASSESSED | Evidence is missing, denied, throttled, timed out, truncated, or the resource type has no checker. The tool does not guess. |
 
-`agent_note` is printed and stored so a person can see what the agent said. Checkers do not read it.
+`agent_note` is printed and stored. Checkers do not read it. There is no model on the verdict path.
 
 ## Evidence
 
-The bundle is JSON. Each AWS call is an item with the parameters, the response or the error, and a sha256 of that item. `bundle_sha256` covers the bundle with that field removed. Canonical form is UTF-8 JSON, object keys sorted, no insignificant whitespace.
+The bundle is JSON. Each AWS call is an item with the parameters, the response or the error, and a sha256 of that item. Secret-bearing fields are redacted before the hash is computed. `bundle_sha256` covers the bundle with that field removed. Canonical form is UTF-8 JSON, object keys sorted, separators `,` and `:` with no extra whitespace. `generated_at` comes from a clock the caller can replace.
 
-```powershell
-shadow-verify --verify-evidence evidence.json
+```bash
+shadow-verify verify evidence.json
 ```
 
 The hash shows whether the file still matches a digest you copied somewhere else (the pull request comment includes it). v0 does not sign the bundle. Rewriting the file and recomputing the hash produces a new digest; it will not match the one recorded at run time.
@@ -75,24 +70,20 @@ The hash shows whether the file still matches a digest you copied somewhere else
 
 ## Security model
 
-- AWS calls go through an allowlist of `Get`, `List`, and `Describe` operations. Anything else is refused in code.
-- Credentials stay in the AWS chain or in the OIDC session the action exports. The tool does not write them to disk.
-- Evidence can contain account ids and policy documents. Treat the bundle as sensitive and do not commit bundles from real accounts.
-- A denied call is NOT ASSESSED. Missing permission is not treated as proof that a resource is safe.
+- AWS calls are an exact allowlist of `service:Operation` pairs. Secret and data reads are denied first. Anything else is refused before a boto3 method is called. See [docs/iam-policy.json](docs/iam-policy.json).
+- `run` accepts a boto3 Session, so a harness can count calls or simulate AccessDenied without this process building its own session.
+- Credentials stay in the AWS chain or in the OIDC session the action exports. The tool does not write them into the evidence bundle. Secret-like fields are redacted before hashing.
+- Evidence can still contain account ids and IAM policy documents. Treat the bundle as sensitive and do not commit bundles from real accounts.
+- A denied, throttled, or timed-out call is NOT ASSESSED. Missing permission is not treated as proof that a resource is safe.
 
 ## Development
-
-```powershell
-python -m pip install -e ".[dev]"
-python -m pytest
-```
 
 ```bash
 python -m pip install -e ".[dev]"
 python -m pytest
 ```
 
-Python 3.11 or newer. Runtime dependency is boto3. pytest and moto are for tests and the demo.
+Python 3.11 or newer. Runtime dependency is boto3. pytest and moto are for tests and the demo. The test suite is mocked.
 
 ## Roadmap
 
@@ -106,6 +97,7 @@ Python 3.11 or newer. Runtime dependency is boto3. pytest and moto are for tests
 
 - [docs/CLAIMS.md](docs/CLAIMS.md) — claim file
 - [docs/IAM.md](docs/IAM.md) — read-only policy
+- [docs/iam-policy.json](docs/iam-policy.json) — the policy document the test locks to the allowlist
 - [AGENTS.md](AGENTS.md) — how to change this repo
 - [STATUS.md](STATUS.md) — what is demonstrated
 - [DECISIONS.md](DECISIONS.md) — choices and when to revisit them

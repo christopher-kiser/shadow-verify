@@ -67,7 +67,7 @@ runs:
         SV_STRICT: ${{ inputs.fail-on-not-assessed }}
       run: |
         set +e
-        args=(--claims "$SV_CLAIMS" --region "$SV_REGION" --evidence "$SV_EVIDENCE" --json)
+        args=(run --claims "$SV_CLAIMS" --region "$SV_REGION" --evidence "$SV_EVIDENCE" --json)
         if [ -n "$SV_PLAN" ]; then
           args+=(--plan "$SV_PLAN")
         fi

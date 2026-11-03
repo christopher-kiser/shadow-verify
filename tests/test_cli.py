@@ -58,6 +58,7 @@ def test_cli_exit_1_on_fail_and_writes_a_verifiable_bundle(tmp_path, capsys):
         _lock_bucket("logs-prod", block_public_policy=False)
         code = run(
             [
+                "run",
                 "--claims",
                 str(claims),
                 "--evidence",
@@ -81,7 +82,7 @@ def test_cli_exit_1_on_fail_and_writes_a_verifiable_bundle(tmp_path, capsys):
     bundle = json.loads(evidence.read_text(encoding="utf-8"))
     assert bundle_problems(bundle) == []
     assert bundle["bundle_sha256"] == report["bundle_sha256"]
-    assert run(["--verify-evidence", str(evidence)]) == 0
+    assert run(["verify", str(evidence)]) == 0
 
 
 def test_cli_exit_0_on_pass(tmp_path, capsys):
@@ -91,7 +92,7 @@ def test_cli_exit_0_on_pass(tmp_path, capsys):
     with mock_aws():
         _lock_bucket("logs-prod", block_public_policy=True)
         code = run(
-            ["--claims", str(claims), "--evidence", str(evidence), "--region", REGION]
+            ["run", "--claims", str(claims), "--evidence", str(evidence), "--region", REGION]
         )
     captured = capsys.readouterr()
     assert code == 0
@@ -105,6 +106,7 @@ def test_fail_on_not_assessed_flag(tmp_path, capsys):
     with mock_aws():
         code = run(
             [
+                "run",
                 "--claims",
                 str(claims),
                 "--evidence",
@@ -122,15 +124,71 @@ def test_fail_on_not_assessed_flag(tmp_path, capsys):
 def test_bad_claims_exit_2(tmp_path, capsys):
     path = tmp_path / "claims.json"
     path.write_text("{", encoding="utf-8")
-    code = run(["--claims", str(path)])
+    code = run(["run", "--claims", str(path)])
     captured = capsys.readouterr()
     assert code == 2
     assert "error:" in captured.err
 
 
+def test_injected_session_and_clock(tmp_path, capsys):
+    """MOCKED. The harness session is the only AWS client. No network."""
+
+    from datetime import datetime, timezone
+
+    from botocore.exceptions import ClientError
+
+    events: list[tuple] = []
+
+    class DenyS3:
+        def get_public_access_block(self, **kwargs):
+            events.append(("GetPublicAccessBlock", kwargs))
+            raise ClientError(
+                {"Error": {"Code": "AccessDenied", "Message": "no"}, "ResponseMetadata": {"HTTPStatusCode": 403}},
+                "GetPublicAccessBlock",
+            )
+
+        def get_bucket_policy_status(self, **kwargs):
+            events.append(("GetBucketPolicyStatus", kwargs))
+            raise ClientError(
+                {"Error": {"Code": "AccessDenied", "Message": "no"}, "ResponseMetadata": {"HTTPStatusCode": 403}},
+                "GetBucketPolicyStatus",
+            )
+
+    class Idle:
+        def __getattr__(self, name):
+            raise AssertionError(f"unexpected call {name}")
+
+    class HarnessSession:
+        def client(self, name, **kwargs):
+            events.append(("client", name, kwargs.get("region_name")))
+            if name == "s3":
+                return DenyS3()
+            return Idle()
+
+    claims = tmp_path / "claims.json"
+    evidence = tmp_path / "evidence.json"
+    _write_claims(claims, "logs-prod", dict(S3_LOCKED), statement="locked", agent_note="PASS")
+    moment = datetime(2026, 11, 3, 6, 0, tzinfo=timezone.utc)
+    code = run(
+        ["run", "--claims", str(claims), "--evidence", str(evidence), "--region", REGION, "--json"],
+        session=HarnessSession(),
+        clock=lambda: moment,
+    )
+    captured = capsys.readouterr()
+    assert code == 0
+    report = json.loads(captured.out)
+    assert report["results"][0]["verdict"] == "NOT_ASSESSED"
+    assert any("AccessDenied" in reason for reason in report["results"][0]["reasons"])
+    bundle = json.loads(evidence.read_text(encoding="utf-8"))
+    assert bundle["generated_at"] == "2026-11-03T06:00:00+00:00"
+    assert ("client", "s3", REGION) in events
+    assert ("GetPublicAccessBlock", {"Bucket": "logs-prod"}) in events
+    assert ("GetBucketPolicyStatus", {"Bucket": "logs-prod"}) in events
+
+
 def test_tampered_bundle_fails_verification(tmp_path, capsys):
     path = tmp_path / "evidence.json"
     path.write_text(json.dumps({"items": [], "bundle_sha256": "nope"}) + "\n", encoding="utf-8")
-    assert run(["--verify-evidence", str(path)]) == 1
+    assert run(["verify", str(path)]) == 1
     captured = capsys.readouterr()
     assert "hash check failed" in captured.err

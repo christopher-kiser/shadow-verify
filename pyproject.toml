@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Check AI coding agents' AWS claims against live, read-only account state."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
 authors = [{ name = "Shadow Verify contributors" }]
 keywords = ["aws", "security", "verification", "agents"]
 dependencies = ["boto3>=1.34"]

@@ -24,13 +24,13 @@
 
 **Revisit when.** Users want NOT ASSESSED to fail the CLI by default.
 
-## Unknown resource types are claims errors
+## Unknown resource types are NOT ASSESSED
 
-**Decision.** A `resource_type` with no registered checker fails at load time with exit 2. The engine still returns NOT ASSESSED if a checker disappears between load and run.
+**Decision.** A `resource_type` with no registered checker is NOT ASSESSED. The claim file still loads. No AWS call is made for that claim.
 
-**Reason.** A typo such as `s3_bukcet` would otherwise exit 0 and look like a successful check.
+**Reason.** An unsupported resource is missing evidence, not a contradiction and not a pass. Exit 2 is reserved for a file the tool cannot parse. The GitHub Action fails the job on NOT ASSESSED, so a typo does not look green in CI.
 
-**Revisit when.** Claims are generated for checkers this process does not have installed, and a soft skip is more useful than a hard error.
+**Revisit when.** A generated claims file should fail the process at load time even for a local run.
 
 ## Missing S3 public access block means the flags are false
 
@@ -80,13 +80,21 @@
 
 **Revisit when.** We have a mapping from claim keys to plan attributes and tests where a plan/live disagreement is a FAIL.
 
-## Evidence hashes, no signature
+## Evidence hashes, redaction, injected clock, no signature
 
-**Decision.** Item and bundle digests are sha256 of canonical JSON (sorted keys, no insignificant whitespace, UTF-8). `--verify-evidence` checks internal consistency. v0 does not sign the bundle.
+**Decision.** Item and bundle digests are sha256 of canonical JSON (sorted keys, compact separators, UTF-8). Secret-bearing fields are replaced with `***REDACTED***` before that JSON is hashed or stored. `generated_at` comes from a clock passed into `run`; tests pass a fixed clock. `shadow-verify verify BUNDLE` recomputes the hashes. v0 does not sign the bundle.
 
-**Reason.** The digest is what a person copies into a pull request comment or a ticket. A signature needs a key story we do not have yet. Internal consistency alone does not stop someone who can rewrite the file and rehash it.
+**Reason.** The digest is what a person copies into a pull request comment. Hashing before redaction would freeze a secret into the digest. A wall clock makes bundle hashes differ on every run, so a golden test needs an injected clock. A signature needs a key story we do not have yet.
 
 **Revisit when.** We sign bundles (sigstore or another published key) and verify the signature rather than only the digest.
+
+## Exact operation allowlist and an explicit deny list
+
+**Decision.** The client allows only the `service:Operation` pairs in `ALLOWED_OPERATIONS`. It is not a `Get*` / `List*` / `Describe*` prefix. `DENIED_OPERATIONS` (secret and data reads) is refused first, before the allowlist and before any boto3 method is resolved. `docs/iam-policy.json` lists those same actions, with no action wildcards and no `ReadOnlyAccess`.
+
+**Reason.** A verb prefix would allow `s3:GetObject` and `secretsmanager:GetSecretValue`. Checking the deny list first keeps those calls blocked even if they are later copied onto the allowlist by mistake.
+
+**Revisit when.** A new checker needs another read. Add the pair to the allowlist, the policy, and a mocked test in the same change. Do not add a data-plane read to either list.
 
 ## Runtime dependency is boto3
 

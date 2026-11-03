@@ -24,6 +24,25 @@ from typing import Any
 from shadow_verify import __version__
 
 CANONICALIZATION = "json-sort-keys-separators-utf8"
+REDACTED = "***REDACTED***"
+
+# Normalized by lowercasing and dropping non-alphanumeric characters.
+_REDACT_KEYS = frozenset(
+    {
+        "secretstring",
+        "secretbinary",
+        "password",
+        "passworddata",
+        "privatekey",
+        "privatekeymaterial",
+        "secretaccesskey",
+        "sessiontoken",
+        "accesstoken",
+        "authorization",
+        "securitytoken",
+        "xamzsecuritytoken",
+    }
+)
 
 
 def to_jsonable(value: Any) -> Any:
@@ -50,6 +69,27 @@ def to_jsonable(value: Any) -> Any:
     if isinstance(value, (list, tuple)):
         return [to_jsonable(item) for item in value]
     raise TypeError(f"cannot freeze {type(value).__name__} into evidence")
+
+
+def _normal_key(key: str) -> str:
+    return "".join(char for char in key.lower() if char.isalnum())
+
+
+def redact(value: Any) -> Any:
+    """Replace secret-bearing fields before they are stored or hashed."""
+
+    if isinstance(value, dict):
+        redacted: dict[str, Any] = {}
+        for key, item in value.items():
+            name = str(key)
+            if _normal_key(name) in _REDACT_KEYS:
+                redacted[name] = REDACTED
+            else:
+                redacted[name] = redact(item)
+        return redacted
+    if isinstance(value, list):
+        return [redact(item) for item in value]
+    return value
 
 
 def canonical_dumps(value: Any) -> str:
@@ -132,17 +172,17 @@ class EvidenceLog:
         error_response: Any = None,
     ) -> EvidenceItem:
         item_id = f"{service}.{operation}#{len(self.items) + 1}"
-        frozen_params = to_jsonable(params)
+        frozen_params = redact(to_jsonable(params))
         if error_code is not None:
             body: dict[str, Any] = {
                 "error": {
                     "code": error_code,
                     "message": (error_message or "")[:500],
-                    "response": to_jsonable(error_response) if error_response is not None else None,
+                    "response": redact(to_jsonable(error_response)) if error_response is not None else None,
                 }
             }
         else:
-            body = {"response": to_jsonable(response)}
+            body = {"response": redact(to_jsonable(response))}
         payload = {
             "id": item_id,
             "service": service,

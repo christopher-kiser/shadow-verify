@@ -10,23 +10,40 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 
 from shadow_verify.errors import ShadowVerifyError
 from shadow_verify.evidence import EvidenceItem, EvidenceLog
 
-ALLOWED_OPERATIONS: frozenset[tuple[str, str]] = frozenset(
+# Exact service:Operation pairs this process calls. Not a verb prefix.
+# docs/iam-policy.json Allow actions must stay equal to this set.
+ALLOWED_OPERATIONS: frozenset[str] = frozenset(
     {
-        ("s3", "GetPublicAccessBlock"),
-        ("s3", "GetBucketPolicyStatus"),
-        ("ec2", "DescribeSecurityGroups"),
-        ("iam", "GetRole"),
-        ("iam", "ListAttachedRolePolicies"),
-        ("iam", "ListRolePolicies"),
-        ("iam", "GetRolePolicy"),
-        ("iam", "GetPolicy"),
-        ("iam", "GetPolicyVersion"),
+        "s3:GetPublicAccessBlock",
+        "s3:GetBucketPolicyStatus",
+        "ec2:DescribeSecurityGroups",
+        "iam:GetRole",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListRolePolicies",
+        "iam:GetRolePolicy",
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion",
+    }
+)
+
+# Data and secret reads. Refused even if someone later adds them to the allowlist.
+DENIED_OPERATIONS: frozenset[str] = frozenset(
+    {
+        "secretsmanager:GetSecretValue",
+        "s3:GetObject",
+        "ssm:GetParameter",
+        "ssm:GetParameters",
+        "kms:Decrypt",
+        "dynamodb:GetItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "lambda:GetFunction",
+        "ec2:GetPasswordData",
     }
 )
 
@@ -36,6 +53,25 @@ _SNAKE = re.compile(r"(?<!^)(?=[A-Z])")
 
 def operation_method_name(operation: str) -> str:
     return _SNAKE.sub("_", operation).lower()
+
+
+def operation_pair(service: str, operation: str) -> str:
+    return f"{service}:{operation}"
+
+
+def refusal(service: str, operation: str) -> str | None:
+    """Return a refusal reason, or None when the call may be sent.
+
+    Denied pairs are refused first, then anything absent from the exact
+    allowlist. The client method is not looked up until this returns None.
+    """
+
+    pair = operation_pair(service, operation)
+    if pair in DENIED_OPERATIONS:
+        return f"refusing denied AWS call {pair}"
+    if pair not in ALLOWED_OPERATIONS:
+        return f"refusing non-allowlisted AWS call {pair}"
+    return None
 
 
 @dataclass
@@ -63,7 +99,13 @@ class BotoAws:
         self.evidence = evidence
 
     @classmethod
-    def from_session(cls, session: boto3.Session, region: str, evidence: EvidenceLog) -> BotoAws:
+    def from_session(cls, session, region: str, evidence: EvidenceLog) -> BotoAws:
+        """Build clients from a boto3 Session, or any object with client().
+
+        An eval harness can pass its own session to count calls or to raise
+        AccessDenied. region_name is forwarded on every client() call.
+        """
+
         return cls(
             s3=session.client("s3", region_name=region),
             ec2=session.client("ec2", region_name=region),
@@ -140,8 +182,9 @@ class BotoAws:
         return ApiResult(pages=pages, complete=complete)
 
     def _invoke(self, service: str, operation: str, client, **params) -> EvidenceItem:
-        if (service, operation) not in ALLOWED_OPERATIONS:
-            raise ShadowVerifyError(f"refusing non-allowlisted AWS call {service}:{operation}")
+        reason = refusal(service, operation)
+        if reason is not None:
+            raise ShadowVerifyError(reason)
         method = getattr(client, operation_method_name(operation))
         try:
             response = method(**params)

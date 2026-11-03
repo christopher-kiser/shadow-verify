@@ -50,6 +50,7 @@ def main() -> int:
         seed()
         code = run(
             [
+                "run",
                 "--claims",
                 str(CLAIMS),
                 "--region",

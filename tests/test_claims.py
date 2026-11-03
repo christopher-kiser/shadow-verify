@@ -43,7 +43,10 @@ def test_json_claims_round_trip():
     assert claims[0].expected == {"block_public_acls": True}
 
 
-def test_unknown_resource_type_is_a_claims_error():
+def test_unknown_resource_type_is_not_assessed():
+    from shadow_verify.engine import run_checks
+    from shadow_verify.models import Verdict
+
     text = """
     version: 1
     claims:
@@ -54,8 +57,10 @@ def test_unknown_resource_type_is_a_claims_error():
         expected:
           block_public_acls: true
     """
-    with pytest.raises(ClaimsError, match="no checker"):
-        load_claims(text, ".yaml")
+    claims = load_claims(text, ".yaml")
+    result = run_checks(claims, aws=None)[0]
+    assert result.verdict == Verdict.NOT_ASSESSED
+    assert "unsupported resource_type" in result.reasons[0]
 
 
 def test_yaml_rejects_tabs_and_anchors():
