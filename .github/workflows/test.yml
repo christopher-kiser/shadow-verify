@@ -1,8 +1,7 @@
 # Unit tests only. This does not call AWS.
-# Actions minutes on this repository may be blocked by billing. The suite
-# is run locally before release; see STATUS.md.
-# Windows is in the matrix so a run can be observed. Until that run passes,
-# the README says Windows: NOT ASSESSED.
+# 784eb4f was green on ubuntu-latest and windows-latest:
+# https://github.com/christopher-kiser/shadow-verify/actions/runs/41594099486
+# https://github.com/christopher-kiser/shadow-verify/actions/runs/41594105984
 name: tests
 
 on:

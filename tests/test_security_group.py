@@ -125,7 +125,8 @@ def test_security_group_source_is_not_treated_as_world_cidr():
         )
         aws, _evidence = aws_stack()
         result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
-    assert result.verdict == Verdict.PASS, result.reasons
+    assert result.verdict == Verdict.NOT_ASSESSED, result.reasons
+    assert any("unresolvable_source" in reason for reason in result.reasons)
 
 
 def test_all_protocol_rule_covers_port_22():
@@ -143,7 +144,7 @@ def test_all_protocol_rule_covers_port_22():
     assert result.verdict == Verdict.FAIL, result.reasons
 
 
-def test_ipv4_world_does_not_imply_ipv6():
+def test_ipv4_world_fails_an_ipv6_world_forbid():
     with mock_aws():
         group_id = _group(
             [
@@ -168,7 +169,24 @@ def test_ipv4_world_does_not_imply_ipv6():
             ),
             aws,
         )
-    assert result.verdict == Verdict.PASS, result.reasons
+    assert result.verdict == Verdict.FAIL, result.reasons
+
+
+def test_ipv6_world_fails_an_ipv4_world_forbid():
+    with mock_aws():
+        group_id = _group(
+            [
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "Ipv6Ranges": [{"CidrIpv6": "::/0"}],
+                }
+            ]
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
+    assert result.verdict == Verdict.FAIL, result.reasons
 
 
 def test_not_assessed_when_access_is_denied():
@@ -249,6 +267,238 @@ def test_narrow_cidr_does_not_cover_the_world():
         aws, _evidence = aws_stack()
         result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
     assert result.verdict == Verdict.PASS, result.reasons
+
+
+def test_half_internet_fails_a_world_forbid():
+    with mock_aws():
+        group_id = _group(
+            [
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "IpRanges": [{"CidrIp": "0.0.0.0/1"}],
+                }
+            ]
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
+    assert result.verdict == Verdict.FAIL, result.reasons
+
+
+def test_public_host_fails_a_world_forbid():
+    with mock_aws():
+        group_id = _group(
+            [
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "IpRanges": [{"CidrIp": "8.8.8.8/32"}],
+                }
+            ]
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
+    assert result.verdict == Verdict.FAIL, result.reasons
+
+
+def test_rfc1918_passes_a_world_forbid():
+    with mock_aws():
+        group_id = _group(
+            [
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "IpRanges": [{"CidrIp": "10.0.0.0/8"}],
+                }
+            ]
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
+    assert result.verdict == Verdict.PASS, result.reasons
+
+
+def test_overlap_fails_a_private_forbid():
+    with mock_aws():
+        group_id = _group(
+            [
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "IpRanges": [{"CidrIp": "10.1.0.0/16"}],
+                }
+            ]
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(
+            claim(
+                "ec2_security_group",
+                group_id,
+                {
+                    "ingress_forbidden": [
+                        {"protocol": "tcp", "from_port": 22, "to_port": 22, "cidr": "10.0.0.0/8"}
+                    ]
+                },
+            ),
+            aws,
+        )
+    assert result.verdict == Verdict.FAIL, result.reasons
+
+
+def test_disjoint_private_ranges_pass():
+    with mock_aws():
+        group_id = _group(
+            [
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "IpRanges": [{"CidrIp": "192.168.0.0/16"}],
+                }
+            ]
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(
+            claim(
+                "ec2_security_group",
+                group_id,
+                {
+                    "ingress_forbidden": [
+                        {"protocol": "tcp", "from_port": 22, "to_port": 22, "cidr": "10.0.0.0/8"}
+                    ]
+                },
+            ),
+            aws,
+        )
+    assert result.verdict == Verdict.PASS, result.reasons
+
+
+def test_protocol_number_6_is_tcp():
+    with mock_aws():
+        group_id = _group(
+            [
+                {
+                    "IpProtocol": "6",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "IpRanges": [{"CidrIp": "8.8.8.8/32"}],
+                }
+            ]
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
+    assert result.verdict == Verdict.FAIL, result.reasons
+
+
+def test_icmp_all_types_matches_an_icmp_forbid():
+    with mock_aws():
+        group_id = _group(
+            [
+                {
+                    "IpProtocol": "icmp",
+                    "FromPort": -1,
+                    "ToPort": -1,
+                    "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
+                }
+            ]
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(
+            claim(
+                "ec2_security_group",
+                group_id,
+                {
+                    "ingress_forbidden": [
+                        {"protocol": "icmp", "from_port": 0, "to_port": 255, "cidr": "0.0.0.0/0"}
+                    ]
+                },
+            ),
+            aws,
+        )
+    assert result.verdict == Verdict.FAIL, result.reasons
+
+
+def _prefix_list(ec2, cidr: str) -> str:
+    created = ec2.create_managed_prefix_list(
+        PrefixListName=f"pl-{cidr.replace('/', '-')}",
+        AddressFamily="IPv4",
+        MaxEntries=1,
+        Entries=[{"Cidr": cidr, "Description": "test"}],
+    )
+    return created["PrefixList"]["PrefixListId"]
+
+
+def test_prefix_list_alone_is_not_assessed_even_if_it_holds_the_world():
+    with mock_aws():
+        ec2 = boto3.client("ec2", region_name=REGION)
+        vpc_id = ec2.create_vpc(CidrBlock="10.0.0.0/16")["Vpc"]["VpcId"]
+        group_id = ec2.create_security_group(GroupName="app", Description="app", VpcId=vpc_id)["GroupId"]
+        prefix_id = _prefix_list(ec2, "0.0.0.0/0")
+        ec2.authorize_security_group_ingress(
+            GroupId=group_id,
+            IpPermissions=[
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "PrefixListIds": [{"PrefixListId": prefix_id}],
+                }
+            ],
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
+    assert result.verdict == Verdict.NOT_ASSESSED, result.reasons
+    assert any("unresolvable_source" in reason for reason in result.reasons)
+
+
+def test_public_half_plus_prefix_list_in_one_entry_fails():
+    with mock_aws():
+        ec2 = boto3.client("ec2", region_name=REGION)
+        vpc_id = ec2.create_vpc(CidrBlock="10.0.0.0/16")["Vpc"]["VpcId"]
+        group_id = ec2.create_security_group(GroupName="app", Description="app", VpcId=vpc_id)["GroupId"]
+        prefix_id = _prefix_list(ec2, "0.0.0.0/0")
+        ec2.authorize_security_group_ingress(
+            GroupId=group_id,
+            IpPermissions=[
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "IpRanges": [{"CidrIp": "0.0.0.0/1"}],
+                    "PrefixListIds": [{"PrefixListId": prefix_id}],
+                }
+            ],
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
+    assert result.verdict == Verdict.FAIL, result.reasons
+
+
+def test_private_cidr_plus_prefix_list_is_not_assessed():
+    with mock_aws():
+        ec2 = boto3.client("ec2", region_name=REGION)
+        vpc_id = ec2.create_vpc(CidrBlock="10.0.0.0/16")["Vpc"]["VpcId"]
+        group_id = ec2.create_security_group(GroupName="app", Description="app", VpcId=vpc_id)["GroupId"]
+        prefix_id = _prefix_list(ec2, "0.0.0.0/0")
+        ec2.authorize_security_group_ingress(
+            GroupId=group_id,
+            IpPermissions=[
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "IpRanges": [{"CidrIp": "10.0.0.0/8"}],
+                    "PrefixListIds": [{"PrefixListId": prefix_id}],
+                }
+            ],
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
+    assert result.verdict == Verdict.NOT_ASSESSED, result.reasons
+    assert any("unresolvable_source" in reason for reason in result.reasons)
 
 
 def test_not_assessed_when_group_does_not_exist():

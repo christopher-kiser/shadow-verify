@@ -3,19 +3,18 @@
 from __future__ import annotations
 
 from shadow_verify import __version__
-from shadow_verify.models import CheckResult, Verdict
 
 
-def summary_counts(results: list[CheckResult]) -> dict[str, int]:
+def summary_counts(results: list[dict]) -> dict[str, int]:
     return {
-        "pass": sum(1 for item in results if item.verdict == Verdict.PASS),
-        "fail": sum(1 for item in results if item.verdict == Verdict.FAIL),
-        "not_assessed": sum(1 for item in results if item.verdict == Verdict.NOT_ASSESSED),
+        "pass": sum(1 for item in results if item["verdict"] == "PASS"),
+        "fail": sum(1 for item in results if item["verdict"] == "FAIL"),
+        "not_assessed": sum(1 for item in results if item["verdict"] == "NOT_ASSESSED"),
     }
 
 
 def build_report(
-    results: list[CheckResult],
+    results: list[dict],
     *,
     evidence_path: str,
     bundle_sha256: str,
@@ -23,12 +22,14 @@ def build_report(
     mode: str,
     tool_commit: str,
 ) -> dict:
+    """``results`` are the same relabelled dicts stored in the evidence bundle."""
+
     return {
         "shadow_verify": __version__,
         "mode": mode,
         "tool_commit": tool_commit,
         "summary": summary_counts(results),
-        "results": [item.to_dict() for item in results],
+        "results": results,
         "plan_notes": plan_notes,
         "evidence_path": evidence_path,
         "bundle_sha256": bundle_sha256,
@@ -70,4 +71,22 @@ def render_human(report: dict) -> str:
     lines.append("")
     lines.append(f"evidence: {report['evidence_path']}")
     lines.append(f"bundle_sha256: {report['bundle_sha256']}")
+    return "\n".join(lines) + "\n"
+
+
+def render_summary(report: dict) -> str:
+    """Job-summary text. It uses the same relabelled results as ``--json``."""
+
+    counts = report["summary"]
+    lines = [
+        "Shadow Verify",
+        f"pass {counts['pass']} · fail {counts['fail']} · not assessed {counts['not_assessed']}",
+        "",
+        f"bundle {report['bundle_sha256']}",
+        "",
+    ]
+    for result in report["results"]:
+        lines.append(f"{result['verdict']} {result['id']} {result['statement']}")
+        for reason in result["reasons"]:
+            lines.append(f"  {reason}")
     return "\n".join(lines) + "\n"

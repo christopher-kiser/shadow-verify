@@ -29,13 +29,13 @@ import boto3
 from botocore.exceptions import ProfileNotFound
 
 from shadow_verify import __version__
+from shadow_verify.report import build_report, render_human
 from shadow_verify.aws import BotoAws
 from shadow_verify.claims import load_claims_file
 from shadow_verify.engine import run_checks
 from shadow_verify.errors import ShadowVerifyError
 from shadow_verify.evidence import EvidenceLog, bundle_problems
 from shadow_verify.models import Verdict
-from shadow_verify.report import build_report, render_human
 from shadow_verify.terraform import plan_notes, read_plan
 
 Clock = Callable[[], datetime]
@@ -64,9 +64,9 @@ def _tool_commit() -> str:
             text=True,
         )
     except (OSError, subprocess.CalledProcessError):
-        return "unknown"
+        return f"shadow-verify=={__version__}"
     sha = completed.stdout.strip()
-    return sha or "unknown"
+    return sha or f"shadow-verify=={__version__}"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -211,11 +211,11 @@ def _run_claims(args: argparse.Namespace, *, session, clock: Clock) -> int:
         encoding="utf-8",
     )
     report = build_report(
-        results,
+        bundle["results"],
         evidence_path=args.evidence,
         bundle_sha256=bundle["bundle_sha256"],
-        plan_notes=notes,
-        mode=args.mode,
+        plan_notes=bundle["plan_notes"],
+        mode=bundle["mode"],
         tool_commit=bundle["tool_commit"],
     )
     if args.json_output:

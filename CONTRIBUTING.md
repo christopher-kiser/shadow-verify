@@ -12,7 +12,7 @@ python -m pytest
 python examples/demo/run_demo.py
 ```
 
-The demo exits 1. That is the tool catching the false claim. Windows: NOT ASSESSED until a green `windows-latest` job exists. The latest matrix run failed at the audit step on both operating systems: https://github.com/christopher-kiser/shadow-verify/actions/runs/41592185575
+The demo exits 1. That is the tool catching the false claim. CI for `784eb4f` is green on `ubuntu-latest` and `windows-latest`: https://github.com/christopher-kiser/shadow-verify/actions/runs/41594099486 and https://github.com/christopher-kiser/shadow-verify/actions/runs/41594105984.
 
 Read `AGENTS.md` before adding a checker. Verdicts stay deterministic: a change that lets model text or a missing API call produce PASS will not be accepted. Update `docs/CLAIMS.md` and `docs/IAM.md` when the claim schema or the AWS calls change. Update `STATUS.md` and, when you make a durable choice, `DECISIONS.md`.
 

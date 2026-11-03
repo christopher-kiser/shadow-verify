@@ -3,19 +3,19 @@
 ``expected.ingress_forbidden`` is a list of rules that must not be covered
 by any ingress permission. A permission covers a forbidden rule when:
 
-* the permission protocol is ``-1`` (all), or it equals the forbidden
-  protocol; a forbidden protocol of ``-1`` matches only an all-protocol
-  permission
-* the permission's port range overlaps the forbidden range; an
-  all-protocol permission covers every port
-* the union of its IPv4 or IPv6 CIDRs covers the forbidden network.
-  One wider prefix (a superset) is enough. Several narrower prefixes
-  whose ranges together contain the forbidden network are enough.
-  IPv4 does not cover IPv6.
+* its protocol is all (``-1``), or it equals the forbidden protocol
+  after ``6``, ``17``, and ``58`` are read as tcp, udp, and icmpv6
+* its ports overlap the forbid; missing ports and ICMP type ``-1``
+  code ``-1`` mean every port or every ICMP type
+* a forbid of ``0.0.0.0/0`` or ``::/0`` means open to the internet,
+  for both address families: any CIDR that overlaps a globally routable
+  address fails it
+* any other forbid fails on any CIDR overlap
 
-``0.0.0.0/0`` does not imply ``::/0``. Security-group and prefix-list
-sources are not CIDRs and do not count. A permission that matches the
-protocol but has no ports is NOT ASSESSED, not a pass.
+A prefix list or security-group source on that port and protocol is
+``unresolvable_source`` (NOT ASSESSED) unless a CIDR on the same
+permission already fails. Sources in one ``IpPermissions`` entry are
+split before that judgment.
 """
 
 from __future__ import annotations
@@ -25,10 +25,11 @@ from typing import Any
 
 from shadow_verify.aws import BotoAws
 from shadow_verify.checkers.base import blocked, call_failure, finish
+from shadow_verify.checkers.sg_rules import assess_forbid
 from shadow_verify.errors import ClaimsError
 from shadow_verify.models import CheckResult, Claim, PropertyResult, Verdict
 
-_PROTOCOLS = {"tcp", "udp", "icmp", "-1"}
+_PROTOCOLS = {"tcp", "udp", "icmp", "icmpv6", "-1"}
 
 
 class SecurityGroupChecker:
@@ -54,7 +55,7 @@ class SecurityGroupChecker:
             return blocked(claim, "IpPermissions is not a list", evidence_ids)
         properties: list[PropertyResult] = []
         for index, rule in enumerate(rules):
-            properties.append(_assess(index, rule, permissions))
+            properties.append(assess_forbid(index, rule, permissions))
         return finish(claim, properties, evidence_ids)
 
 
@@ -125,122 +126,3 @@ def _port(value: object, index: int, name: str) -> int:
         raise ClaimsError(f"ingress_forbidden[{index}].{name} must be between 0 and 65535")
     return value
 
-
-def _assess(index: int, rule: dict[str, Any], permissions: list) -> PropertyResult:
-    name = f"ingress_forbidden[{index}]"
-    label = (
-        f"{rule['protocol']} {rule['from_port']}-{rule['to_port']} from {rule['cidr']}"
-    )
-    target = ipaddress.ip_network(rule["cidr"], strict=True)
-    observed: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
-    unknown = False
-    for permission in permissions:
-        if not isinstance(permission, dict):
-            unknown = True
-            continue
-        kind, networks = _permission_networks(permission, rule)
-        observed.extend(networks)
-        if kind == "unknown":
-            unknown = True
-    if _union_covers(observed, target):
-        return PropertyResult(
-            name=name,
-            verdict=Verdict.FAIL,
-            reason=f"ingress allows {label}",
-        )
-    if unknown:
-        return PropertyResult(
-            name=name,
-            verdict=Verdict.NOT_ASSESSED,
-            reason=f"ingress permissions could not be fully read for {label}",
-        )
-    return PropertyResult(
-        name=name,
-        verdict=Verdict.PASS,
-        reason=f"no ingress covers {label}",
-    )
-
-
-def _permission_networks(
-    permission: dict,
-    rule: dict[str, Any],
-) -> tuple[str, list[ipaddress.IPv4Network | ipaddress.IPv6Network]]:
-    protocol = permission.get("IpProtocol")
-    if not isinstance(protocol, str):
-        return "unknown", []
-    if not _protocol_covers(protocol, rule["protocol"]):
-        return "no", []
-    if _norm_protocol(protocol) != "-1":
-        if "FromPort" not in permission or "ToPort" not in permission:
-            return "unknown", []
-        try:
-            start = int(permission["FromPort"])
-            end = int(permission["ToPort"])
-        except (TypeError, ValueError):
-            return "unknown", []
-        if not (start <= rule["to_port"] and end >= rule["from_port"]):
-            return "no", []
-    return _networks_from_permission(permission)
-
-
-def _norm_protocol(value: str) -> str:
-    lowered = value.strip().lower()
-    if lowered in {"-1", "all"}:
-        return "-1"
-    return lowered
-
-
-def _protocol_covers(actual: str, expected: str) -> bool:
-    actual_norm = _norm_protocol(actual)
-    if actual_norm == "-1":
-        return True
-    if expected == "-1":
-        return False
-    return actual_norm == expected
-
-
-def _networks_from_permission(
-    permission: dict,
-) -> tuple[str, list[ipaddress.IPv4Network | ipaddress.IPv6Network]]:
-    networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
-    unknown = False
-    for key, field in (("IpRanges", "CidrIp"), ("Ipv6Ranges", "CidrIpv6")):
-        ranges = permission.get(key, [])
-        if ranges is None:
-            continue
-        if not isinstance(ranges, list):
-            return "unknown", networks
-        for entry in ranges:
-            if not isinstance(entry, dict):
-                return "unknown", networks
-            cidr = entry.get(field)
-            if not isinstance(cidr, str) or not cidr:
-                continue
-            try:
-                networks.append(ipaddress.ip_network(cidr, strict=False))
-            except ValueError:
-                unknown = True
-    return ("unknown" if unknown else "no"), networks
-
-
-def _union_covers(
-    observed: list[ipaddress.IPv4Network | ipaddress.IPv6Network],
-    target: ipaddress.IPv4Network | ipaddress.IPv6Network,
-) -> bool:
-    """True when the merged address ranges contain the whole target."""
-
-    spans: list[tuple[int, int]] = []
-    for network in observed:
-        if network.version != target.version:
-            continue
-        spans.append((int(network.network_address), int(network.broadcast_address)))
-    spans.sort()
-    merged: list[list[int]] = []
-    for start, end in spans:
-        if not merged or start > merged[-1][1] + 1:
-            merged.append([start, end])
-        else:
-            merged[-1][1] = max(merged[-1][1], end)
-    left = int(target.network_address)
-    right = int(target.broadcast_address)
-    return any(start <= left and end >= right for start, end in merged)

@@ -6,7 +6,7 @@ Shadow Verify compares a claims file to live AWS read APIs and writes a hashed e
 
 ## Untrusted inputs
 
-The coding agent is untrusted. `agent_note`, pull request text, and any model output are recorded and are not inputs to PASS or FAIL.
+The coding agent is untrusted. A claim, `agent_note`, tool output, pull request text, and any model output are untrusted text. They are recorded and are not inputs to PASS or FAIL. No model is in the verdict path. Prompt injection in a claim or a tool result cannot grant PASS.
 
 A pull request is untrusted, including one from a fork. Fork workflows must not receive `id-token: write`. The OIDC trust policy in `docs/oidc-trust-policy.json` allows only `repo:ORG/REPO:ref:refs/heads/main` (or an environment subject you substitute for that line). It does not allow `repo:ORG/REPO:pull_request`.
 
@@ -38,4 +38,4 @@ The bundle is hashed with SHA-256 over RFC 8785 bytes after redaction and after 
 
 ## Out of scope for v0
 
-CloudTrail, a signature, and new checkers are not in this version. Windows is NOT ASSESSED until a green `windows-latest` job exists.
+CloudTrail, a signature, and new checkers are not in this version. CI for `784eb4f` passed on `ubuntu-latest` and `windows-latest`.

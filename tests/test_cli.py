@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import boto3
@@ -6,7 +7,10 @@ from moto import mock_aws
 
 from shadow_verify.cli import run
 from shadow_verify.evidence import bundle_problems
+from shadow_verify.report import render_summary
 from tests.helpers import REGION, S3_LOCKED
+
+_ACCOUNT_ID = re.compile(r"(?<!\d)\d{12}(?!\d)")
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -244,3 +248,80 @@ def test_tampered_bundle_fails_verification(tmp_path, capsys):
     assert run(["verify", str(path)]) == 3
     captured = capsys.readouterr()
     assert "hash check failed" in captured.err
+
+
+def test_cli_reports_do_not_leak_account_ids(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("SV_TOOL_COMMIT", "test-commit")
+    claims = tmp_path / "claims.json"
+    claims.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "claims": [
+                    {
+                        "id": "role",
+                        "statement": "trust is only EC2",
+                        "resource_type": "iam_role",
+                        "identifier": "app",
+                        "expected": {
+                            "trust_principals": ["ec2.amazonaws.com"],
+                            "attached_policy_arns": [],
+                            "no_admin_star": True,
+                        },
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    evidence = tmp_path / "evidence.json"
+    args = [
+        "run",
+        "--claims",
+        str(claims),
+        "--evidence",
+        str(evidence),
+        "--region",
+        REGION,
+        "--mode",
+        "MOCKED",
+    ]
+
+    def seed() -> None:
+        iam = boto3.client("iam", region_name=REGION)
+        iam.create_role(
+            RoleName="app",
+            AssumeRolePolicyDocument=json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {"AWS": "arn:aws:iam::123456789012:root"},
+                            "Action": "sts:AssumeRole",
+                        }
+                    ],
+                }
+            ),
+        )
+
+    with mock_aws():
+        seed()
+        code = run(args)
+    human = capsys.readouterr().out
+    assert code == 1
+    assert "123456789012" not in human
+    assert _ACCOUNT_ID.search(human) is None
+
+    with mock_aws():
+        seed()
+        code = run([*args, "--json"])
+    raw = capsys.readouterr().out
+    assert code == 1
+    report = json.loads(raw)
+    scrubbed = raw.replace(report["bundle_sha256"], "")
+    assert "123456789012" not in scrubbed
+    assert _ACCOUNT_ID.search(scrubbed) is None
+    summary = render_summary(report)
+    assert "123456789012" not in summary
+    assert _ACCOUNT_ID.search(summary) is None

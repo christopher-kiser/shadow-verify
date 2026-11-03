@@ -30,7 +30,7 @@ shadow-verify run --claims .shadow/claims.yaml --region us-east-1 --json
 
 `python -m shadow_verify` is the same console entry point.
 
-These commands were run on Linux. Windows: NOT ASSESSED.
+These commands were run on Linux. CI for `784eb4f` also passed on `windows-latest`; the links are under GitHub Action.
 
 ## Exit codes
 
@@ -55,7 +55,7 @@ Precedence is **FAIL**, then **NOT ASSESSED**, then **PASS**.
 
 ## Evidence
 
-The bundle is JSON. Each AWS call is an item with the parameters, the response or the error, and a sha256 of that item. Secret-bearing fields are redacted before the hash is computed. `bundle_sha256` covers the bundle with that field removed. Canonical form is UTF-8 JSON, object keys sorted, separators `,` and `:` with no extra whitespace. `generated_at` comes from a clock the caller can replace.
+The bundle is JSON. Each AWS call is an item with the parameters, the response or the error, and a sha256 of that item. Secret-bearing fields are redacted and twelve-digit account ids are replaced with `account-N` labels before the hash is computed. `ResponseMetadata` is not hashed. `bundle_sha256` is SHA-256 of the RFC 8785 canonical JSON for the bundle with that field removed (`rfc8785==0.1.4`). `generated_at` comes from a clock the caller can replace.
 
 ```bash
 shadow-verify verify evidence.json
@@ -69,7 +69,12 @@ The check reads the account after a change is deployed. [examples/github-workflo
 
 ## GitHub Action
 
-`action.yml` is a composite action. It installs this package, optionally assumes a read-only role with GitHub OIDC, runs the CLI, writes the job summary, and uploads the evidence bundle. Third-party actions are pinned to commit SHAs. The sample workflow does not use `@main`. This repository has no release SHA yet, so the example uses a placeholder and says to replace it. Windows: NOT ASSESSED.
+`action.yml` is a composite action. It installs this package with `requirements-ci.txt` as a constraint, optionally assumes a read-only role with GitHub OIDC, runs the CLI, writes the job summary, and uploads the evidence bundle. Third-party actions are pinned to commit SHAs. The sample workflow does not use `@main`. This repository has no release commit for the action itself, so the example uses a placeholder SHA and says to replace it.
+
+CI for commit `784eb4f` is green on `ubuntu-latest` and `windows-latest`:
+
+- push: https://github.com/christopher-kiser/shadow-verify/actions/runs/41594099486
+- pull request: https://github.com/christopher-kiser/shadow-verify/actions/runs/41594105984
 
 ## Security model
 
@@ -78,6 +83,14 @@ The check reads the account after a change is deployed. [examples/github-workflo
 - Credentials stay in the AWS chain or in the OIDC session the action exports. The tool does not write them into the evidence bundle. Secret-like fields are redacted before hashing.
 - The stored bundle replaces account ids with `account-N` labels. It can still contain role names and policy documents. Treat it as sensitive and do not commit bundles from a real account. See [THREAT_MODEL.md](THREAT_MODEL.md).
 - A denied, throttled, or timed-out call is NOT ASSESSED. Missing permission is not treated as proof that a resource is safe.
+
+## Limits
+
+`run` defaults to `LIVE`. `--mode MOCKED` records that the calls did not hit a real account. A MOCKED bundle is not evidence about production.
+
+A security-group source that is a prefix list or another security group is `unresolvable_source` and the claim is NOT ASSESSED, unless a CIDR on that same port and protocol already fails. v0 does not call `GetManagedPrefixListEntries`.
+
+S3 checks are the four public-access-block flags and `GetBucketPolicyStatus.IsPublic`. They do not read object ACLs, the bucket ACL, or the account-level public access block. The IAM action for `GetPublicAccessBlock` is `s3:GetBucketPublicAccessBlock`.
 
 ## Development
 

@@ -6,7 +6,25 @@ Allow actions are the IAM actions for the API operations the client calls. The m
 
 Each client uses botocore standard retries, `max_attempts` 3, a 3 second connect timeout, and a 10 second read timeout. The worst case for one call is about 52 seconds: three attempts at 13 seconds each, plus at most 13 seconds of backoff and retry-after across the two gaps.
 
-Deny actions are data and secret reads: `secretsmanager:GetSecretValue`, `s3:GetObject`, `ssm:GetParameter`, `ssm:GetParameters`, `kms:Decrypt`, `dynamodb:GetItem`, `dynamodb:Query`, `dynamodb:Scan`, `lambda:GetFunction`, and `ec2:GetPasswordData`. The client refuses those, and any other call that is not on the allowlist, before it looks up a boto3 method. A write such as `s3:PutBucketPolicy` is refused the same way.
+The client refuses these 15 data and secret reads before it looks up a boto3 method, and the policy denies the same list:
+
+1. `secretsmanager:GetSecretValue`
+2. `s3:GetObject`
+3. `s3:GetObjectVersion`
+4. `ssm:GetParameter`
+5. `ssm:GetParameters`
+6. `ssm:GetParametersByPath`
+7. `ssm:GetParameterHistory`
+8. `kms:Decrypt`
+9. `dynamodb:GetItem`
+10. `dynamodb:BatchGetItem`
+11. `dynamodb:Query`
+12. `dynamodb:Scan`
+13. `dynamodb:ExecuteStatement`
+14. `lambda:GetFunction`
+15. `ec2:GetPasswordData`
+
+Any other call that is not on the allowlist, including a write such as `s3:PutBucketPolicy`, is refused the same way.
 
 `ec2:DescribeSecurityGroups` is its own statement with `Resource` `*`. EC2 Describe calls do not support resource-level permissions. S3 actions are limited to `arn:aws:s3:::*`. IAM role reads are limited to `arn:aws:iam::*:role/*`. IAM policy reads are limited to `arn:aws:iam::*:policy/*` and `arn:aws:iam::aws:policy/*`. Action strings contain no wildcards.
 

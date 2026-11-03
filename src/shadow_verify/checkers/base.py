@@ -6,20 +6,6 @@ from shadow_verify.evidence import EvidenceItem
 from shadow_verify.models import CheckResult, Claim, PropertyResult, Verdict
 from shadow_verify.verdict import decide
 
-DENIED_CODES = frozenset(
-    {
-        "AccessDenied",
-        "AccessDeniedException",
-        "UnauthorizedOperation",
-        "UnauthorizedException",
-        "NotAuthorized",
-        "Forbidden",
-        "NoCredentialsError",
-        "PartialCredentialsError",
-        "CredentialRetrievalError",
-    }
-)
-
 
 def finish(
     claim: Claim,

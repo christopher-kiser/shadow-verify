@@ -13,11 +13,16 @@ Review the pull request. The highest-value follow-up is whichever open question 
 Local mocked run on Python 3.12.3 (Linux), 2026-11-03. Every AWS interaction in the suite is moto, botocore Stubber, or an in-process fake session. Nothing here called a real account.
 
 ```
-python3 -m pytest -v
-90 passed, 1 skipped in 10.18s
+python3 -m pytest -q
+103 passed, 1 skipped in 14.41s
 ```
 
-MOCKED. The skip is `tests/test_live.py` because `SV_LIVE` is not set. The run includes CIDR superset and half-range failures, the IAM action map, account-id indexing, identical moto bundle hashes, one test per exit code, and the socket block. A clean virtualenv with pip 26.3 and setuptools 84.2.1 reported `No known vulnerabilities found` from `python -m pip_audit`. That GitHub Actions run is not observed yet.
+MOCKED. The skip is `tests/test_live.py` because `SV_LIVE` is not set. Two mocked demo runs both exited 1 with `bundle_sha256` `39f3a4677a9830ced8d9b7ad7d325c0758e4783955832d46686381f62b5701b4`. `python -m pip_audit` in a clean virtualenv printed `No known vulnerabilities found`.
+
+CI for `784eb4f` is green on `ubuntu-latest` and `windows-latest`:
+
+- https://github.com/christopher-kiser/shadow-verify/actions/runs/41594099486 (push)
+- https://github.com/christopher-kiser/shadow-verify/actions/runs/41594105984 (pull request)
 
 `python3 examples/demo/run_demo.py` is mocked. It exited 1. Stdout included:
 
@@ -31,12 +36,8 @@ No AWS account was used. moto supplied the bucket.
 
 ## Not established
 
-- A green CI run after the pip and setuptools upgrade. Observed runs:
-  - Green, before `pip-audit` was added: https://github.com/christopher-kiser/shadow-verify/actions/runs/41591643960 and https://github.com/christopher-kiser/shadow-verify/actions/runs/41591639417
-  - Red at `Audit dependencies` on both `ubuntu-latest` (setuptools 79.0.1) and `windows-latest` (setuptools 65.5.0): https://github.com/christopher-kiser/shadow-verify/actions/runs/41592185575
-  - The fix (upgrade pip to 26.3 and setuptools to 84.2.1, then audit) is not observed on GitHub yet.
+- GitHub Actions for the commit after `784eb4f` (internet-overlap rules and report relabeling). Those jobs start when that commit is pushed.
 - A real AWS account. Every PASS / FAIL / NOT ASSESSED result in the local suite is MOCKED.
-- Windows: NOT ASSESSED. `windows-latest` has run, and that job is not green. The README does not claim Windows support.
 - Terraform value comparison. `--plan` only reports whether an address is in `resource_changes`.
 - CloudTrail.
 - A signature on the evidence bundle. `shadow-verify verify` checks internal hashes only.
@@ -58,4 +59,5 @@ No AWS account was used. moto supplied the bucket.
 - 2026-11-03 — Built v0: claims loader, S3 / security group / IAM checkers, evidence hashes, CLI, composite action, moto demo. Tests: 58 passed in 8.67s on Python 3.12.3. Demo exits 1 on a false "bucket locked down" claim. Next: review the pull request and pick an open question before adding checkers.
 - 2026-11-03 — Folded in review notes: exact `service:Operation` allowlist plus an explicit secret-read deny list, `docs/iam-policy.json`, `verify` subcommand, redaction before hashing, injected clock, Session injection, unsupported resource types as NOT ASSESSED. Windows is not claimed. Mocked `python3 -m pytest -q`: 64 passed in 8.26s. Next: review the updated pull request.
 - 2026-11-03 — Second review batch: pinned action SHAs, post-deploy example workflow, scoped IAM statements, OIDC trust pins, pip-audit and pytest strict settings, ubuntu/windows CI matrix. Windows: NOT ASSESSED. Mocked `python3 -m pytest -v`: 65 passed in 9.17s. Next: review PR 1.
-- 2026-11-03 — Forge correctness fixes: CIDR coverage, IAM action map, account-id index, RFC 8785 hashes, exit codes 0/1/2/3, socket block, client Config, mode and tool_commit. MOCKED `python3 -m pytest -v`: 90 passed, 1 skipped in 10.18s. CI after the setuptools upgrade is not observed. Windows: NOT ASSESSED. Next: review PR 1.
+- 2026-11-03 — Forge correctness fixes: CIDR coverage, IAM action map, account-id index, RFC 8785 hashes, exit codes 0/1/2/3, socket block, client Config, mode and tool_commit. MOCKED `python3 -m pytest -v`: 90 passed, 1 skipped in 10.18s. CI for 784eb4f later went green on ubuntu-latest and windows-latest.
+- 2026-11-03 — Internet overlap instead of full cover, both address families for a world forbid, protocol numbers, unresolvable prefix lists and security-group sources, reports built from relabelled results. MOCKED `python3 -m pytest -q`: 103 passed, 1 skipped in 14.41s. Demo hash stable across two runs. Next: review PR 1 after the new Actions jobs finish.
