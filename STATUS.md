@@ -34,9 +34,17 @@ FAIL  logs-bucket  S3 bucket locked down
 
 No AWS account was used. moto supplied the bucket.
 
+## CI
+
+`784eb4f` and `6db1641` are green on `ubuntu-latest` and `windows-latest`.
+
+- `784eb4f` push: https://github.com/christopher-kiser/shadow-verify/actions/runs/41594099486
+- `784eb4f` pull request: https://github.com/christopher-kiser/shadow-verify/actions/runs/41594105984
+- `6db1641` push: https://github.com/christopher-kiser/shadow-verify/actions/runs/41596335023
+- `6db1641` pull request: https://github.com/christopher-kiser/shadow-verify/actions/runs/41596340401
+
 ## Not established
 
-- GitHub Actions for the commit after `784eb4f` (internet-overlap rules and report relabeling). Those jobs start when that commit is pushed.
 - A real AWS account. Every PASS / FAIL / NOT ASSESSED result in the local suite is MOCKED.
 - Terraform value comparison. `--plan` only reports whether an address is in `resource_changes`.
 - CloudTrail.
@@ -60,4 +68,4 @@ No AWS account was used. moto supplied the bucket.
 - 2026-11-03 — Folded in review notes: exact `service:Operation` allowlist plus an explicit secret-read deny list, `docs/iam-policy.json`, `verify` subcommand, redaction before hashing, injected clock, Session injection, unsupported resource types as NOT ASSESSED. Windows is not claimed. Mocked `python3 -m pytest -q`: 64 passed in 8.26s. Next: review the updated pull request.
 - 2026-11-03 — Second review batch: pinned action SHAs, post-deploy example workflow, scoped IAM statements, OIDC trust pins, pip-audit and pytest strict settings, ubuntu/windows CI matrix. Windows: NOT ASSESSED. Mocked `python3 -m pytest -v`: 65 passed in 9.17s. Next: review PR 1.
 - 2026-11-03 — Forge correctness fixes: CIDR coverage, IAM action map, account-id index, RFC 8785 hashes, exit codes 0/1/2/3, socket block, client Config, mode and tool_commit. MOCKED `python3 -m pytest -v`: 90 passed, 1 skipped in 10.18s. CI for 784eb4f later went green on ubuntu-latest and windows-latest.
-- 2026-11-03 — Internet overlap instead of full cover, both address families for a world forbid, protocol numbers, unresolvable prefix lists and security-group sources, reports built from relabelled results. MOCKED `python3 -m pytest -q`: 103 passed, 1 skipped in 12.28s. Demo hash stable across two runs. Next: review PR 1 after the new Actions jobs finish.
+- 2026-11-03 — Internet overlap instead of full cover, both address families for a world forbid, protocol numbers, unresolvable prefix lists and security-group sources, reports built from relabelled results. MOCKED `python3 -m pytest -q`: 103 passed, 1 skipped in 12.28s. Demo hash stable across two runs. CI for 6db1641 is green on ubuntu-latest and windows-latest. Next: review PR 1.
