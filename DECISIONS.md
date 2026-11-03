@@ -1,6 +1,6 @@
 # Decisions
 
-## Deterministic verdicts
+## ADR 001 — 2026-11-03 — Deterministic verdicts
 
 **Decision.** Property rules in the checkers are the only way to reach PASS or FAIL. `agent_note` is stored and printed. It is not read by a checker.
 
@@ -8,7 +8,7 @@
 
 **Revisit when.** A later version drafts a claim file from a plan or a pull request. That draft is still untrusted input. It still cannot grant PASS.
 
-## FAIL outranks a missing read
+## ADR 002 — 2026-11-03 — FAIL outranks a missing read
 
 **Decision.** If any property contradicts the claim, the claim is FAIL even when another required call was denied. NOT ASSESSED is used only when nothing contradicted the claim and at least one required observation is missing or not understood. An empty observation list is NOT ASSESSED.
 
@@ -16,7 +16,7 @@
 
 **Revisit when.** A checker needs a quorum rule, for example "both the policy and CloudTrail must agree".
 
-## Exit codes
+## ADR 003 — 2026-11-03 — Exit codes
 
 **Decision.** Exit 1 on any FAIL. Exit 2 on a bad claims file, a bad plan file, or a bad profile. Exit 0 when every claim is PASS or NOT ASSESSED. `--fail-on-not-assessed` also exits 1 on NOT ASSESSED. The GitHub Action defaults that flag to true.
 
@@ -24,7 +24,7 @@
 
 **Revisit when.** Users want NOT ASSESSED to fail the CLI by default.
 
-## Unknown resource types are NOT ASSESSED
+## ADR 004 — 2026-11-03 — Unknown resource types are NOT ASSESSED
 
 **Decision.** A `resource_type` with no registered checker is NOT ASSESSED. The claim file still loads. No AWS call is made for that claim.
 
@@ -32,7 +32,7 @@
 
 **Revisit when.** A generated claims file should fail the process at load time even for a local run.
 
-## Missing S3 public access block means the flags are false
+## ADR 005 — 2026-11-03 — Missing S3 public access block means the flags are false
 
 **Decision.** `NoSuchPublicAccessBlockConfiguration` is an observation that no configuration is stored. The checker compares the four flags as false, which is the AWS default, and the reason says that.
 
@@ -40,7 +40,7 @@
 
 **Revisit when.** We see an account or partition where a missing configuration does not mean the flags are false.
 
-## Bucket policy publicity is `IsPublic` only
+## ADR 006 — 2026-11-03 — Bucket policy publicity is `IsPublic` only
 
 **Decision.** `bucket_policy_public` is `GetBucketPolicyStatus` `PolicyStatus.IsPublic`. `NoSuchBucketPolicy` is observed as false. The checker does not parse the policy document.
 
@@ -48,7 +48,7 @@
 
 **Revisit when.** We need the policy document in the bundle for a person, or `IsPublic` disagrees with the console in a way we can cite.
 
-## Security group coverage is exact and one-directional
+## ADR 007 — 2026-11-03 — Security group coverage is exact and one-directional
 
 **Decision.** CIDR match is an exact string. Port ranges overlap. A permission with protocol `-1` covers any forbidden protocol and every port. A forbidden protocol of `-1` matches only an all-protocol permission. `0.0.0.0/0` does not imply `::/0`. Security-group and prefix-list sources do not satisfy a CIDR forbid. A matching permission with no ports is NOT ASSESSED.
 
@@ -56,7 +56,7 @@
 
 **Revisit when.** A claim needs "not reachable from the internet", which would have to include both world CIDRs and maybe prefix lists.
 
-## IAM admin is star action plus star resource
+## ADR 008 — 2026-11-03 — IAM admin is star action plus star resource
 
 **Decision.** `no_admin_star: true` FAILs an Allow statement whose Action is `*` or `*:*` and whose Resource is `*`. Deny does not count. `NotAction` or `NotResource` is NOT ASSESSED. Inline policies are scanned for admin and are not part of the attached-ARN set. Trust comparison uses principal values and ignores conditions. The conditions stay in the `GetRole` evidence. A role that cannot be read (`GetRole` denied or missing) stops the rest of that claim as NOT ASSESSED.
 
@@ -64,7 +64,7 @@
 
 **Revisit when.** We compare OIDC conditions, we decide that unclaimed inline policies should fail the claim, or we want `GetRole` denial to still scan attached policies.
 
-## Missing resources are NOT ASSESSED
+## ADR 009 — 2026-11-03 — Missing resources are NOT ASSESSED
 
 **Decision.** `NoSuchBucket`, a missing security group, and `NoSuchEntity` for a role are NOT ASSESSED.
 
@@ -72,7 +72,7 @@
 
 **Revisit when.** We add an explicit absence claim.
 
-## Terraform plan does not affect verdicts
+## ADR 010 — 2026-11-03 — Terraform plan does not affect verdicts
 
 **Decision.** `--plan` records whether each `terraform_address` exists in `resource_changes` and which actions the plan lists. Checkers do not read those notes. The limit is marked TODO in `src/shadow_verify/terraform.py`.
 
@@ -80,7 +80,7 @@
 
 **Revisit when.** We have a mapping from claim keys to plan attributes and tests where a plan/live disagreement is a FAIL.
 
-## Evidence hashes, redaction, injected clock, no signature
+## ADR 011 — 2026-11-03 — Evidence hashes, redaction, injected clock, no signature
 
 **Decision.** Item and bundle digests are sha256 of canonical JSON (sorted keys, compact separators, UTF-8). Secret-bearing fields are replaced with `***REDACTED***` before that JSON is hashed or stored. `generated_at` comes from a clock passed into `run`; tests pass a fixed clock. `shadow-verify verify BUNDLE` recomputes the hashes. v0 does not sign the bundle.
 
@@ -88,7 +88,7 @@
 
 **Revisit when.** We sign bundles (sigstore or another published key) and verify the signature rather than only the digest.
 
-## Exact operation allowlist and an explicit deny list
+## ADR 012 — 2026-11-03 — Exact operation allowlist and an explicit deny list
 
 **Decision.** The client allows only the `service:Operation` pairs in `ALLOWED_OPERATIONS`. It is not a `Get*` / `List*` / `Describe*` prefix. `DENIED_OPERATIONS` (secret and data reads) is refused first, before the allowlist and before any boto3 method is resolved. `docs/iam-policy.json` lists those same actions, with no action wildcards and no `ReadOnlyAccess`.
 
@@ -96,7 +96,7 @@
 
 **Revisit when.** A new checker needs another read. Add the pair to the allowlist, the policy, and a mocked test in the same change. Do not add a data-plane read to either list.
 
-## Runtime dependency is boto3
+## ADR 013 — 2026-11-03 — Runtime dependency is boto3
 
 **Decision.** The installed tool depends on boto3 and the standard library. Claim YAML is a subset parser. JSON is the escape hatch. pytest and moto are dev dependencies.
 
@@ -104,7 +104,7 @@
 
 **Revisit when.** Real claim files need YAML features the subset rejects and JSON is not an acceptable output for the agents writing them.
 
-## CloudTrail is out of v0
+## ADR 014 — 2026-11-03 — CloudTrail is out of v0
 
 **Decision.** No CloudTrail calls in v0.
 
@@ -112,10 +112,26 @@
 
 **Revisit when.** A checker needs to corroborate that a change happened, with an explicit rule that CloudTrail cannot grant PASS by itself.
 
-## GitHub Action is stricter than the CLI
+## ADR 015 — 2026-11-03 — GitHub Action is stricter than the CLI
 
-**Decision.** `fail-on-not-assessed` defaults to true in `action.yml` and false in the CLI. The action assumes a role only when `role-to-assume` is set, installs this package from `github.action_path`, and posts a comment plus a job summary.
+**Decision.** `fail-on-not-assessed` defaults to true in `action.yml` and false in the CLI. The action assumes a role only when `role-to-assume` is set, installs this package from `github.action_path`, and writes a job summary.
 
-**Reason.** Local exploration should show NOT ASSESSED without failing the process. A pull request check that could not read the account should fail.
+**Reason.** Local exploration should show NOT ASSESSED without failing the process. A deployed-account check that could not read AWS should fail the job.
 
-**Revisit when.** The action is split into a "report only" mode for forks that cannot assume the role.
+**Revisit when.** The action is split into a report-only mode for workflows that cannot assume the role.
+
+## ADR 016 — 2026-11-03 — Run after deploy
+
+**Decision.** The example workflow triggers on a push to `main` or a successful `deployment_status`. It does not trigger on `pull_request`. A pull request run is documented as a preview-account option only.
+
+**Reason.** The product checks the account after a change is deployed. A pull request workflow reads the account before merge, so a PASS there does not mean the merged change landed.
+
+**Revisit when.** A repository deploys from pull requests into a preview account and wants a separate workflow for that account.
+
+## ADR 017 — 2026-11-03 — Scoped IAM policy and pinned OIDC trust
+
+**Decision.** `ec2:DescribeSecurityGroups` is the only allow statement with `Resource` `*`, because EC2 Describe calls do not support resource scoping. S3 and IAM allows use ARN patterns. The OIDC trust policy sets `aud` to `sts.amazonaws.com` and `sub` to `repo:ORG/REPO:ref:refs/heads/main` (or an environment subject, as a replacement). It does not include a `pull_request` subject. Fork pull requests must not receive `id-token: write`.
+
+**Reason.** A broad `ReadOnlyAccess` role and an unpinned GitHub subject would let this checker, or a fork workflow, read more than the claims require.
+
+**Revisit when.** The claims file is known ahead of time and the role can be limited to those exact ARNs, or deploys move to a GitHub environment subject.

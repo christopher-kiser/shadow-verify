@@ -2,20 +2,44 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "ShadowVerifyAllowlist",
+      "Sid": "Ec2DescribeSecurityGroups",
       "Effect": "Allow",
       "Action": [
-        "ec2:DescribeSecurityGroups",
-        "iam:GetPolicy",
-        "iam:GetPolicyVersion",
-        "iam:GetRole",
-        "iam:GetRolePolicy",
-        "iam:ListAttachedRolePolicies",
-        "iam:ListRolePolicies",
+        "ec2:DescribeSecurityGroups"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3BucketReads",
+      "Effect": "Allow",
+      "Action": [
         "s3:GetBucketPolicyStatus",
         "s3:GetPublicAccessBlock"
       ],
-      "Resource": "*"
+      "Resource": "arn:aws:s3:::*"
+    },
+    {
+      "Sid": "IamRoleReads",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:GetRolePolicy",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListRolePolicies"
+      ],
+      "Resource": "arn:aws:iam::*:role/*"
+    },
+    {
+      "Sid": "IamPolicyReads",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion"
+      ],
+      "Resource": [
+        "arn:aws:iam::*:policy/*",
+        "arn:aws:iam::aws:policy/*"
+      ]
     },
     {
       "Sid": "DenyDataAndSecretReads",

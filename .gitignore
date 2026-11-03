@@ -8,3 +8,14 @@ build/
 shadow-verify-evidence.json
 examples/demo/last-evidence.json
 .DS_Store
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.aws/credentials
+credentials
+credentials.json
+credentials.csv

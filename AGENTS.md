@@ -25,7 +25,7 @@ Shadow Verify checks live AWS state against explicit claims. Verdicts are determ
 | `src/shadow_verify/evidence.py` | Canonical JSON and sha256 |
 | `src/shadow_verify/aws.py` | Read-only client and allowlist |
 | `src/shadow_verify/engine.py` | Runs one checker per claim |
-| `src/shadow_verify/checkers/` | One module per resource type. Register in `__init__.py` |
+| `src/shadow_verify/checkers/` | One module per resource type. IAM is split across `iam_role.py`, `iam_documents.py`, and `iam_admin.py`. Register in `__init__.py` |
 | `src/shadow_verify/terraform.py` | Plan notes. The v0 limit is a TODO in that file |
 | `docs/CLAIMS.md` | User-facing claim schema |
 | `docs/iam-policy.json` | Allow and deny actions. Must match the code lists |

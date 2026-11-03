@@ -1,26 +1,51 @@
 # Example only. Copy to .github/workflows/shadow-verify.yml in the repo that
-# should be checked. This file is not wired up on shadow-verify itself.
+# deploys the account under test. This file is not wired up on shadow-verify.
 #
-# The role's policy is docs/IAM.md. The workflow needs id-token: write so
-# GitHub can assume that role. It does not need AWS keys in the repo.
+# Shadow Verify reads the live account. A pull_request run happens before
+# merge, so it answers "what is true now" for a change that is not deployed
+# yet. Use it only against a preview account that the pull request already
+# updated. The workflow below runs after deploy: a push to main, or a
+# successful GitHub deployment.
+#
+# Do not assume this role from a fork pull_request. Fork workflows must not
+# receive id-token: write. The trust policy in docs/oidc-trust-policy.json
+# pins sub to this repo's main branch, which does not match
+# repo:ORG/REPO:pull_request. Do not add a pull_request subject.
+#
+# shadow-verify has no published commit yet. @main moves, so this example
+# does not use it. Replace the placeholder SHA below with the full commit
+# you intend to run, and keep the version in the comment.
 name: shadow-verify
 
 on:
-  pull_request:
+  push:
+    branches: [main]
+  deployment_status:
 
 permissions:
-  id-token: write
   contents: read
-  pull-requests: write
 
 jobs:
   verify:
+    if: >-
+      github.event_name != 'pull_request' &&
+      (
+        (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+        (github.event_name == 'deployment_status' && github.event.deployment_status.state == 'success')
+      )
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      checks: write
+      actions: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: christopher-kiser/shadow-verify@main
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # Placeholder, not a real commit. Pin the SHA after v0 is merged.
+      - uses: christopher-kiser/shadow-verify@0000000000000000000000000000000000000000 # v0.1.0 placeholder
         with:
           claims-file: .shadow/claims.yaml
           aws-region: us-east-1
           role-to-assume: arn:aws:iam::123456789012:role/ShadowVerifyReadOnly
           fail-on-not-assessed: "true"
+          comment-on-pr: "false"

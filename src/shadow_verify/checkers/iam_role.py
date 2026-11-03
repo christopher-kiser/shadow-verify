@@ -21,17 +21,28 @@ by themselves fail the ARN comparison.
 
 from __future__ import annotations
 
-import json
-import urllib.parse
 from typing import Any
 
 from shadow_verify.aws import ApiResult, BotoAws
 from shadow_verify.checkers.base import blocked, call_failure, finish
+from shadow_verify.checkers.iam_admin import scan_role_admin
+from shadow_verify.checkers.iam_documents import (
+    admin_finding,
+    allow_principals,
+    decode_policy_document,
+)
 from shadow_verify.errors import ClaimsError
 from shadow_verify.models import CheckResult, Claim, PropertyResult, Verdict
 
 _CONDITION_NOTE = "conditions are not compared in v0"
-_ADMIN_ACTIONS = {"*", "*:*"}
+
+__all__ = [
+    "IamRoleChecker",
+    "admin_finding",
+    "allow_principals",
+    "decode_policy_document",
+    "role_name_from_identifier",
+]
 
 
 class IamRoleChecker:
@@ -93,7 +104,7 @@ class IamRoleChecker:
                 )
             )
 
-        admin_result, admin_ids = _admin_scan(
+        admin_result, admin_ids = scan_role_admin(
             aws,
             role_name,
             trust_doc if trust_error is None else None,
@@ -162,89 +173,6 @@ def role_name_from_identifier(identifier: str) -> str:
     return identifier
 
 
-def allow_principals(document: dict) -> tuple[set[str] | None, str | None]:
-    statements = document.get("Statement")
-    if isinstance(statements, dict):
-        statements = [statements]
-    if not isinstance(statements, list):
-        return None, "trust policy Statement is missing or not a list"
-    found: set[str] = set()
-    for statement in statements:
-        if not isinstance(statement, dict):
-            return None, "trust policy statement is not a mapping"
-        if statement.get("Effect", "Allow") != "Allow":
-            continue
-        if "Principal" not in statement:
-            return None, "Allow statement has no Principal"
-        values = _principal_values(statement["Principal"])
-        if values is None:
-            return None, "unsupported Principal shape"
-        found.update(values)
-    return found, None
-
-
-def _principal_values(principal: object) -> set[str] | None:
-    if principal == "*":
-        return {"*"}
-    if isinstance(principal, str) and principal:
-        return {principal}
-    if not isinstance(principal, dict) or not principal:
-        return None
-    values: set[str] = set()
-    for key, val in principal.items():
-        if key not in {"AWS", "Service", "Federated", "CanonicalUser"}:
-            return None
-        if isinstance(val, str) and val:
-            values.add(val)
-        elif isinstance(val, list) and val and all(isinstance(item, str) and item for item in val):
-            values.update(val)
-        else:
-            return None
-    return values
-
-
-def admin_finding(document: dict) -> tuple[str, str]:
-    """Return (admin|clear|not_assessed, detail)."""
-
-    statements = document.get("Statement")
-    if isinstance(statements, dict):
-        statements = [statements]
-    if not isinstance(statements, list):
-        return "not_assessed", "policy Statement is missing or not a list"
-    for statement in statements:
-        if not isinstance(statement, dict):
-            return "not_assessed", "policy statement is not a mapping"
-        if statement.get("Effect", "Allow") != "Allow":
-            continue
-        if "NotAction" in statement or "NotResource" in statement:
-            return "not_assessed", "NotAction or NotResource is not evaluated in v0"
-        actions = _as_strings(statement.get("Action"))
-        resources = _as_strings(statement.get("Resource"))
-        if actions is None or resources is None:
-            return "not_assessed", "Action or Resource shape was not understood"
-        if any(action in _ADMIN_ACTIONS for action in actions) and any(resource == "*" for resource in resources):
-            return "admin", "Allow statement grants Action * or *:* on Resource *"
-    return "clear", "no Allow statement grants Action * or *:* on Resource *"
-
-
-def decode_policy_document(document: object) -> dict | None:
-    if isinstance(document, dict):
-        return document
-    if not isinstance(document, str):
-        return None
-    candidates = [document]
-    if "%" in document:
-        candidates.insert(0, urllib.parse.unquote(document))
-    for candidate in candidates:
-        try:
-            parsed = json.loads(candidate)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict):
-            return parsed
-    return None
-
-
 def _trust_document(response: dict) -> tuple[dict | None, str | None]:
     role = response.get("Role")
     if not isinstance(role, dict):
@@ -301,113 +229,3 @@ def _collect_strings(
             values.append(entry[field])
     return values, None
 
-
-def _as_strings(value: object) -> list[str] | None:
-    if isinstance(value, str):
-        return [value]
-    if isinstance(value, list) and all(isinstance(item, str) for item in value):
-        return list(value)
-    if value is None:
-        return []
-    return None
-
-
-def _admin_scan(
-    aws: BotoAws,
-    role_name: str,
-    trust_doc: dict | None,
-    attached_arns: list[str] | None,
-    inline_names: list[str] | None,
-    inline_problem: str | None,
-) -> tuple[PropertyResult, list[str]]:
-    evidence_ids: list[str] = []
-    unclear: str | None = None
-    if trust_doc is None:
-        unclear = "trust policy was not readable, so the admin scan is incomplete"
-    else:
-        kind, detail = admin_finding(trust_doc)
-        if kind == "admin":
-            return (
-                PropertyResult(name="no_admin_star", verdict=Verdict.FAIL, reason=f"trust policy {detail}"),
-                evidence_ids,
-            )
-        if kind == "not_assessed":
-            unclear = f"trust policy {detail}"
-
-    if inline_problem or inline_names is None:
-        unclear = unclear or inline_problem or "inline policy list was incomplete"
-    else:
-        for policy_name in inline_names:
-            item = aws.get_role_policy(role_name, policy_name)
-            evidence_ids.append(item.id)
-            if not item.ok:
-                unclear = call_failure("GetRolePolicy", item)
-                continue
-            document = decode_policy_document(item.response.get("PolicyDocument"))
-            if document is None:
-                unclear = f"inline policy {policy_name} document could not be read"
-                continue
-            kind, detail = admin_finding(document)
-            if kind == "admin":
-                return (
-                    PropertyResult(
-                        name="no_admin_star",
-                        verdict=Verdict.FAIL,
-                        reason=f"inline policy {policy_name} {detail}",
-                    ),
-                    evidence_ids,
-                )
-            if kind == "not_assessed":
-                unclear = f"inline policy {policy_name}: {detail}"
-
-    if attached_arns is None:
-        unclear = unclear or "attached policy list was incomplete, so policy documents were not scanned"
-    else:
-        for arn in attached_arns:
-            meta = aws.get_policy(arn)
-            evidence_ids.append(meta.id)
-            if not meta.ok:
-                unclear = call_failure("GetPolicy", meta)
-                continue
-            policy = meta.response.get("Policy")
-            version_id = policy.get("DefaultVersionId") if isinstance(policy, dict) else None
-            if not isinstance(version_id, str) or not version_id:
-                unclear = f"GetPolicy for {arn} has no DefaultVersionId"
-                continue
-            version = aws.get_policy_version(arn, version_id)
-            evidence_ids.append(version.id)
-            if not version.ok:
-                unclear = call_failure("GetPolicyVersion", version)
-                continue
-            version_body = version.response.get("PolicyVersion")
-            raw_doc = version_body.get("Document") if isinstance(version_body, dict) else None
-            document = decode_policy_document(raw_doc)
-            if document is None:
-                unclear = f"attached policy {arn} document could not be read"
-                continue
-            kind, detail = admin_finding(document)
-            if kind == "admin":
-                return (
-                    PropertyResult(
-                        name="no_admin_star",
-                        verdict=Verdict.FAIL,
-                        reason=f"attached policy {arn} {detail}",
-                    ),
-                    evidence_ids,
-                )
-            if kind == "not_assessed":
-                unclear = f"attached policy {arn}: {detail}"
-
-    if unclear:
-        return (
-            PropertyResult(name="no_admin_star", verdict=Verdict.NOT_ASSESSED, reason=unclear),
-            evidence_ids,
-        )
-    return (
-        PropertyResult(
-            name="no_admin_star",
-            verdict=Verdict.PASS,
-            reason="no Allow statement grants Action * or *:* on Resource *",
-        ),
-        evidence_ids,
-    )

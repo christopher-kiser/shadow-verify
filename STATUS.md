@@ -13,11 +13,11 @@ Review the pull request. The highest-value follow-up is whichever open question 
 Local mocked run on Python 3.12.3 (Linux), 2026-11-03. Every AWS interaction in the suite is moto, botocore Stubber, or an in-process fake session. Nothing here called a real account.
 
 ```
-python3 -m pytest -q
-64 passed in 8.26s
+python3 -m pytest -v
+65 passed in 9.17s
 ```
 
-`python3 -m pytest -v` in the same session reported 64 passed. That includes the allowlist refusals for `GetSecretValue`, `GetObject`, and `PutBucketPolicy` before any client call, the IAM policy equality test, the golden bundle hash, the injected session and clock, and timeout / throttling / AccessDenied as NOT ASSESSED.
+MOCKED. That run includes the allowlist refusals, the IAM policy resource split, the OIDC trust-policy pin, the golden bundle hash, and timeout / throttling / AccessDenied as NOT ASSESSED. A clean virtualenv `python -m pip_audit` reported `No known vulnerabilities found` and skipped the unpublished `shadow-verify` distribution.
 
 `python3 examples/demo/run_demo.py` is mocked. It exited 1. Stdout included:
 
@@ -33,7 +33,7 @@ No AWS account was used. moto supplied the bucket.
 
 - GitHub Actions on this repository. `.github/workflows/test.yml` is a unit-test workflow only. Actions minutes here may be blocked by billing, and this session did not observe a run.
 - A real AWS account. Every PASS / FAIL / NOT ASSESSED result is mocked.
-- Windows. Not claimed. This session did not run the tool on Windows.
+- Windows: NOT ASSESSED. The test workflow includes `windows-latest`, and this session did not run it. The README does not claim Windows support.
 - Terraform value comparison. `--plan` only reports whether an address is in `resource_changes`.
 - CloudTrail.
 - A signature on the evidence bundle. `shadow-verify verify` checks internal hashes only.
@@ -54,3 +54,4 @@ No AWS account was used. moto supplied the bucket.
 
 - 2026-11-03 — Built v0: claims loader, S3 / security group / IAM checkers, evidence hashes, CLI, composite action, moto demo. Tests: 58 passed in 8.67s on Python 3.12.3. Demo exits 1 on a false "bucket locked down" claim. Next: review the pull request and pick an open question before adding checkers.
 - 2026-11-03 — Folded in review notes: exact `service:Operation` allowlist plus an explicit secret-read deny list, `docs/iam-policy.json`, `verify` subcommand, redaction before hashing, injected clock, Session injection, unsupported resource types as NOT ASSESSED. Windows is not claimed. Mocked `python3 -m pytest -q`: 64 passed in 8.26s. Next: review the updated pull request.
+- 2026-11-03 — Second review batch: pinned action SHAs, post-deploy example workflow, scoped IAM statements, OIDC trust pins, pip-audit and pytest strict settings, ubuntu/windows CI matrix. Windows: NOT ASSESSED. Mocked `python3 -m pytest -v`: 65 passed in 9.17s. Next: review PR 1.

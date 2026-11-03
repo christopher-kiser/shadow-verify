@@ -72,3 +72,25 @@ def test_iam_policy_actions_equal_the_allowlist():
     assert set(deny) == set(DENIED_OPERATIONS)
     assert len(allow) == len(set(allow))
     assert len(deny) == len(set(deny))
+    by_sid = {statement["Sid"]: statement for statement in policy["Statement"]}
+    ec2 = by_sid["Ec2DescribeSecurityGroups"]
+    assert ec2["Action"] == ["ec2:DescribeSecurityGroups"]
+    assert ec2["Resource"] == "*"
+    assert by_sid["S3BucketReads"]["Resource"] == "arn:aws:s3:::*"
+    assert by_sid["IamRoleReads"]["Resource"] == "arn:aws:iam::*:role/*"
+    assert "arn:aws:iam::*:policy/*" in by_sid["IamPolicyReads"]["Resource"]
+    for statement in policy["Statement"]:
+        if statement["Sid"] == "Ec2DescribeSecurityGroups":
+            continue
+        if statement["Effect"] != "Allow":
+            continue
+        assert statement["Resource"] != "*"
+
+
+def test_oidc_trust_policy_pins_audience_and_subject():
+    document = json.loads((ROOT / "docs" / "oidc-trust-policy.json").read_text(encoding="utf-8"))
+    condition = document["Statement"][0]["Condition"]["StringEquals"]
+    assert condition["token.actions.githubusercontent.com:aud"] == "sts.amazonaws.com"
+    subject = condition["token.actions.githubusercontent.com:sub"]
+    assert subject == "repo:ORG/REPO:ref:refs/heads/main"
+    assert "pull_request" not in json.dumps(document)

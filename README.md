@@ -30,7 +30,7 @@ shadow-verify run --claims .shadow/claims.yaml --region us-east-1 --json
 
 `python -m shadow_verify` is the same console entry point.
 
-These commands were run on Linux. Windows is not a tested target for v0.
+These commands were run on Linux. Windows: NOT ASSESSED.
 
 ## Exit codes
 
@@ -64,9 +64,13 @@ shadow-verify verify evidence.json
 
 The hash shows whether the file still matches a digest you copied somewhere else (the pull request comment includes it). v0 does not sign the bundle. Rewriting the file and recomputing the hash produces a new digest; it will not match the one recorded at run time.
 
+## When it runs
+
+The check reads the account after a change is deployed. [examples/github-workflow.yml](examples/github-workflow.yml) runs on a push to `main` or a successful GitHub deployment. A `pull_request` run reads the account before merge, so it does not show whether the merged change landed. Use a pull request run only against a preview account that the pull request already updated, and do not assume the production role from a fork.
+
 ## GitHub Action
 
-`action.yml` is a composite action. It installs this package, optionally assumes a read-only role with GitHub OIDC, runs the CLI, writes the job summary, uploads the evidence bundle, and comments on the pull request. The sample workflow is [examples/github-workflow.yml](examples/github-workflow.yml). Run it from `ubuntu-latest`. Pin the action to a commit SHA before you depend on it.
+`action.yml` is a composite action. It installs this package, optionally assumes a read-only role with GitHub OIDC, runs the CLI, writes the job summary, and uploads the evidence bundle. Third-party actions are pinned to commit SHAs. The sample workflow does not use `@main`. This repository has no release SHA yet, so the example uses a placeholder and says to replace it. Windows: NOT ASSESSED.
 
 ## Security model
 
