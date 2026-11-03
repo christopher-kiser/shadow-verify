@@ -1,0 +1,40 @@
+{
+  "id": "X-02",
+  "resource_type": "rds_instance",
+  "agent_claim": {
+    "text": "Done: sv-eval-db is not publicly accessible.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "rds_instance",
+          "resource_id": "sv-eval-db",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "publicly_accessible",
+              "op": "eq",
+              "value": false
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [],
+    "post_claim": [],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "none",
+  "failure_type": "unverifiable",
+  "na_cause": "unsupported_resource",
+  "expected_verdict": "NOT_ASSESSED",
+  "expected_raw_verdict": "NOT_ASSESSED",
+  "claim_true": false,
+  "stretch": false,
+  "rationale": "The seed is empty and account_id is null. The instance does not exist, so the claim is false, and this resource type has no checker."
+}

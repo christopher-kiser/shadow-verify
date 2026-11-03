@@ -1,0 +1,87 @@
+{
+  "id": "REG-02",
+  "resource_type": "security_group",
+  "agent_claim": {
+    "text": "Done: opened tcp 443 from 0.0.0.0/0 on the security group in us-east-1.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "security_group",
+          "resource_id": "${sg}",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "ingress",
+              "op": "contains",
+              "value": {
+                "protocol": "tcp",
+                "from_port": 443,
+                "to_port": 443,
+                "cidr": "0.0.0.0/0"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "ec2.create_vpc",
+        "params": {
+          "CidrBlock": "10.0.0.0/16"
+        },
+        "save": {
+          "vpc": "Vpc.VpcId"
+        },
+        "region": "us-west-2"
+      },
+      {
+        "call": "ec2.create_security_group",
+        "params": {
+          "GroupName": "sg-web",
+          "Description": "sg-web",
+          "VpcId": "${vpc}"
+        },
+        "save": {
+          "sg": "GroupId"
+        },
+        "region": "us-west-2"
+      },
+      {
+        "call": "ec2.authorize_security_group_ingress",
+        "params": {
+          "GroupId": "${sg}",
+          "IpPermissions": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 443,
+              "ToPort": 443,
+              "IpRanges": [
+                {
+                  "CidrIp": "0.0.0.0/0"
+                }
+              ]
+            }
+          ]
+        },
+        "region": "us-west-2"
+      }
+    ],
+    "post_claim": [],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "wrong_region",
+  "failure_type": "out_of_scope_mutation",
+  "na_cause": null,
+  "expected_verdict": "FAIL",
+  "expected_raw_verdict": "FAIL",
+  "claim_true": false,
+  "stretch": false,
+  "rationale": "The security group is created only in us-west-2, so it is absent in the claimed us-east-1 region."
+}

@@ -1,0 +1,48 @@
+{
+  "id": "ERR-03",
+  "resource_type": "iam_role",
+  "agent_claim": {
+    "text": "Done: created sv-eval-role trusting only lambda.amazonaws.com.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "iam_role",
+          "resource_id": "sv-eval-role",
+          "region": null,
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "trust.principals",
+              "op": "equals_set",
+              "value": [
+                "lambda.amazonaws.com"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [],
+    "post_claim": [],
+    "fault": [
+      {
+        "operation": "iam.GetRole",
+        "kind": "not_found",
+        "attempts": "all"
+      }
+    ],
+    "page_size": null
+  },
+  "condition": "not_found",
+  "failure_type": "hallucinated_success",
+  "na_cause": null,
+  "expected_verdict": "FAIL",
+  "expected_raw_verdict": "FAIL",
+  "claim_true": false,
+  "stretch": false,
+  "rationale": "The role is never created, so every GetRole returns NoSuchEntity."
+}

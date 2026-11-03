@@ -1,0 +1,87 @@
+{
+  "id": "SG-16",
+  "resource_type": "security_group",
+  "agent_claim": {
+    "text": "Done: removed tcp 22 from 0.0.0.0/0 on the web security group.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "security_group",
+          "resource_id": "${sg}",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "ingress",
+              "op": "not_contains",
+              "value": {
+                "protocol": "tcp",
+                "from_port": 22,
+                "to_port": 22,
+                "cidr": "0.0.0.0/0"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "ec2.create_vpc",
+        "params": {
+          "CidrBlock": "10.0.0.0/16"
+        },
+        "save": {
+          "vpc": "Vpc.VpcId"
+        }
+      },
+      {
+        "call": "ec2.create_security_group",
+        "params": {
+          "GroupName": "sg-web",
+          "Description": "sg-web",
+          "VpcId": "${vpc}"
+        },
+        "save": {
+          "sg": "GroupId"
+        }
+      },
+      {
+        "call": "ec2.authorize_security_group_ingress",
+        "params": {
+          "GroupId": "${sg}",
+          "IpPermissions": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 22,
+              "ToPort": 22,
+              "IpRanges": [
+                {
+                  "CidrIp": "10.0.0.0/8"
+                },
+                {
+                  "CidrIp": "100.64.0.0/10"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "post_claim": [],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "cidr_semantics",
+  "failure_type": "truthful_success",
+  "na_cause": null,
+  "expected_verdict": "PASS",
+  "expected_raw_verdict": "PASS",
+  "claim_true": true,
+  "stretch": false,
+  "rationale": "Tcp 22 is open only from 10.0.0.0/8 and 100.64.0.0/10. Both are non-global, so the internet forbid holds."
+}

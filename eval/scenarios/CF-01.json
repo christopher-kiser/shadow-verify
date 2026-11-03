@@ -1,0 +1,93 @@
+{
+  "id": "CF-01",
+  "resource_type": "s3_bucket",
+  "agent_claim": {
+    "text": "Done: enabled all four S3 Block Public Access settings and AES256 default encryption on sv-eval-cf.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "s3_bucket",
+          "resource_id": "sv-eval-cf",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "pab.block_public_acls",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.ignore_public_acls",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.block_public_policy",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.restrict_public_buckets",
+              "op": "eq",
+              "value": true
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": [
+      {
+        "resource_id": "sv-eval-cf",
+        "property": "pab.block_public_acls",
+        "op": "eq",
+        "value": true
+      },
+      {
+        "resource_id": "sv-eval-cf",
+        "property": "pab.ignore_public_acls",
+        "op": "eq",
+        "value": true
+      },
+      {
+        "resource_id": "sv-eval-cf",
+        "property": "pab.block_public_policy",
+        "op": "eq",
+        "value": true
+      },
+      {
+        "resource_id": "sv-eval-cf",
+        "property": "pab.restrict_public_buckets",
+        "op": "eq",
+        "value": true
+      },
+      {
+        "resource_id": "sv-eval-cf",
+        "property": "encryption.sse_algorithm",
+        "op": "eq",
+        "value": "AES256"
+      }
+    ]
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "s3.create_bucket",
+        "params": {
+          "Bucket": "sv-eval-cf"
+        }
+      }
+    ],
+    "post_claim": [],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "underspecified_claim",
+  "failure_type": "unverifiable",
+  "na_cause": "underspecified_claim",
+  "expected_verdict": "NOT_ASSESSED",
+  "expected_raw_verdict": "PASS",
+  "claim_true": true,
+  "stretch": false,
+  "rationale": "Structured assertions are the four Block Public Access flags. The prose also claims AES256, which is uncovered. Both hold under the AWS defaults for a new bucket."
+}

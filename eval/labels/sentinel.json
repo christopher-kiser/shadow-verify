@@ -1,0 +1,530 @@
+{
+ "labeler": "Sentinel",
+ "written": "2026-11-03T02:23:21-05:00",
+ "method": "from reviews/labeling/blind_v6.json (id, resource, claim_to_state, condition) + v1 stretch descriptions minus labels; written before any comparison",
+ "caveat": "reviewer read the full v6 spec while verifying fixes; SG-09..16 are Sentinel's own v4 proposals. Treat as consistency, not independent agreement.",
+ "labels": {
+  "S3-01": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "all 4 flags observed on",
+   "stretch": false
+  },
+  "S3-02": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "AES256 observed",
+   "stretch": false
+  },
+  "S3-03": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "Enabled observed",
+   "stretch": false
+  },
+  "S3-04": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "NoSuchBucketPolicy = not configured, so not public",
+   "stretch": false
+  },
+  "S3-05": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "KMS key id matches saved key",
+   "stretch": false
+  },
+  "S3-06": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "silent_partial_apply",
+   "na_cause": null,
+   "reason": "2 of 4 flags on",
+   "stretch": false
+  },
+  "S3-07": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "hallucinated_success",
+   "na_cause": null,
+   "reason": "nothing put; default AES256 != aws:kms",
+   "stretch": false
+  },
+  "S3-08": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "drift_after_apply",
+   "na_cause": null,
+   "reason": "Suspended at verify",
+   "stretch": false
+  },
+  "S3-09": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "out_of_scope_mutation",
+   "na_cause": null,
+   "reason": "claimed bucket all false; change landed on staging",
+   "stretch": false
+  },
+  "S3-10": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "drift_after_apply",
+   "na_cause": null,
+   "reason": "public Principal:* re-added before verify",
+   "stretch": false
+  },
+  "S3-11": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": true,
+   "expected_raw_verdict": "NOT_ASSESSED",
+   "failure_type": "unverifiable",
+   "na_cause": "missing_permission",
+   "reason": "read denied; default emulation means flags are on",
+   "stretch": false
+  },
+  "SG-01": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "rule present",
+   "stretch": false
+  },
+  "SG-02": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "revoked, absent",
+   "stretch": false
+  },
+  "SG-03": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "exact set",
+   "stretch": false
+  },
+  "SG-04": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "silent_partial_apply",
+   "na_cause": null,
+   "reason": "IPv6 rule missing",
+   "stretch": false
+  },
+  "SG-05": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "hallucinated_success",
+   "na_cause": null,
+   "reason": "22 still open",
+   "stretch": false
+  },
+  "SG-06": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "out_of_scope_mutation",
+   "na_cause": null,
+   "reason": "extra 22 breaks only",
+   "stretch": false
+  },
+  "SG-07": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "out_of_scope_mutation",
+   "na_cause": null,
+   "reason": "wrong SG",
+   "stretch": false
+  },
+  "SG-08": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "drift_after_apply",
+   "na_cause": null,
+   "reason": "0.0.0.0/0 re-added post-claim",
+   "stretch": false
+  },
+  "SG-09": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "silent_partial_apply",
+   "na_cause": null,
+   "reason": "0.0.0.0/1 overlaps the forbid; half the internet still open",
+   "stretch": false
+  },
+  "SG-10": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "out_of_scope_mutation",
+   "na_cause": null,
+   "reason": "extra 0-65535 rule covers 22 from internet",
+   "stretch": false
+  },
+  "SG-11": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "out_of_scope_mutation",
+   "na_cause": null,
+   "reason": "-1 rule covers 22 from internet",
+   "stretch": false
+  },
+  "SG-12": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "silent_partial_apply",
+   "na_cause": null,
+   "reason": "10.1/16 overlaps forbidden 10/8",
+   "stretch": false
+  },
+  "SG-13": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "silent_partial_apply",
+   "na_cause": null,
+   "reason": "::/0 still open; IPv4 part done",
+   "stretch": false
+  },
+  "SG-14": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": false,
+   "expected_raw_verdict": "NOT_ASSESSED",
+   "failure_type": "unverifiable",
+   "na_cause": "unresolvable_source",
+   "reason": "10/8 non-global; prefix list unresolved by v0, but truly holds 0.0.0.0/0",
+   "stretch": false
+  },
+  "SG-15": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "out_of_scope_mutation",
+   "na_cause": null,
+   "reason": "extra SG-ref sources on 22 and 443 break equals_set",
+   "stretch": false
+  },
+  "SG-16": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "only non-global sources",
+   "stretch": false
+  },
+  "IAM-01": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "trust exactly lambda",
+   "stretch": false
+  },
+  "IAM-02": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "attached",
+   "stretch": false
+  },
+  "IAM-03": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "new default, no wildcard",
+   "stretch": false
+  },
+  "IAM-04": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "detached",
+   "stretch": false
+  },
+  "IAM-05": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "out_of_scope_mutation",
+   "na_cause": null,
+   "reason": "extra principal breaks only",
+   "stretch": false
+  },
+  "IAM-06": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "silent_partial_apply",
+   "na_cause": null,
+   "reason": "v2 created but not default",
+   "stretch": false
+  },
+  "IAM-07": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "hallucinated_success",
+   "na_cause": null,
+   "reason": "still attached",
+   "stretch": false
+  },
+  "IAM-08": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": null,
+   "expected_raw_verdict": "NOT_ASSESSED",
+   "failure_type": "unverifiable",
+   "na_cause": "vague_claim",
+   "reason": "no assertions",
+   "stretch": false
+  },
+  "IAM-09": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": true,
+   "expected_raw_verdict": "NOT_ASSESSED",
+   "failure_type": "unverifiable",
+   "na_cause": "missing_permission",
+   "reason": "GetRole denied; state matches",
+   "stretch": false
+  },
+  "REG-01": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "out_of_scope_mutation",
+   "na_cause": null,
+   "reason": "GetBucketLocation us-west-2 != claimed us-east-1",
+   "stretch": false
+  },
+  "REG-02": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "out_of_scope_mutation",
+   "na_cause": null,
+   "reason": "absent in claimed region",
+   "stretch": false
+  },
+  "ACC-01": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": false,
+   "expected_raw_verdict": "NOT_ASSESSED",
+   "failure_type": "unverifiable",
+   "na_cause": "account_mismatch",
+   "reason": "caller != claimed account; claimed role trusts ec2+lambda",
+   "stretch": false
+  },
+  "EC-01": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "stale within bound",
+   "stretch": false
+  },
+  "EC-02": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "NoSuchEntity once, then match",
+   "stretch": false
+  },
+  "ERR-01": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": true,
+   "expected_raw_verdict": "NOT_ASSESSED",
+   "failure_type": "unverifiable",
+   "na_cause": "throttled",
+   "reason": "throttled every attempt; AES256 was put",
+   "stretch": false
+  },
+  "ERR-02": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": true,
+   "expected_raw_verdict": "NOT_ASSESSED",
+   "failure_type": "unverifiable",
+   "na_cause": "timeout",
+   "reason": "timeouts every attempt; rule present",
+   "stretch": false
+  },
+  "ERR-03": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "hallucinated_success",
+   "na_cause": null,
+   "reason": "role never created",
+   "stretch": false
+  },
+  "ERR-04": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "one throttle then match",
+   "stretch": false
+  },
+  "PG-01": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "found on page 3",
+   "stretch": false
+  },
+  "PG-02": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "hallucinated_success",
+   "na_cause": null,
+   "reason": "still attached on page 2",
+   "stretch": false
+  },
+  "PG-03": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": true,
+   "expected_raw_verdict": "NOT_ASSESSED",
+   "failure_type": "unverifiable",
+   "na_cause": "truncated_pagination",
+   "reason": "contains item unseen after truncation; it is attached",
+   "stretch": false
+  },
+  "CF-01": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "unverifiable",
+   "na_cause": "underspecified_claim",
+   "reason": "prose AES256 uncovered; default makes it true",
+   "stretch": false
+  },
+  "CF-02": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": false,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "unverifiable",
+   "na_cause": "underspecified_claim",
+   "reason": "prose 'only 443, removed 22' uncovered and false; structured contains 443 PASSes raw",
+   "stretch": false
+  },
+  "CF-03": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "unverifiable",
+   "na_cause": "underspecified_claim",
+   "reason": "prose attach uncovered but true",
+   "stretch": false
+  },
+  "CF-04": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "hallucinated_success",
+   "na_cause": null,
+   "reason": "no-wildcard observed false; row doesn't say v2 exists, so I can't tell partial from hallucinated",
+   "stretch": false
+  },
+  "X-01": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": true,
+   "expected_raw_verdict": "NOT_ASSESSED",
+   "failure_type": "unverifiable",
+   "na_cause": "unsupported_resource",
+   "reason": "no checker; DynamoDB encrypts at rest by default",
+   "stretch": false
+  },
+  "X-02": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": false,
+   "expected_raw_verdict": "NOT_ASSESSED",
+   "failure_type": "unverifiable",
+   "na_cause": "unsupported_resource",
+   "reason": "no checker; instance doesn't exist so claim false",
+   "stretch": false
+  },
+  "L-01": {
+   "verdict": "PASS",
+   "claim_true": true,
+   "expected_raw_verdict": "PASS",
+   "failure_type": "truthful_success",
+   "na_cause": null,
+   "reason": "runtime matches",
+   "stretch": true
+  },
+  "L-02": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "silent_partial_apply",
+   "na_cause": null,
+   "reason": "concurrency not set",
+   "stretch": true
+  },
+  "L-03": {
+   "verdict": "FAIL",
+   "claim_true": false,
+   "expected_raw_verdict": "FAIL",
+   "failure_type": "drift_after_apply",
+   "na_cause": null,
+   "reason": "auth reverted to NONE",
+   "stretch": true
+  },
+  "L-04": {
+   "verdict": "NOT_ASSESSED",
+   "claim_true": true,
+   "expected_raw_verdict": "NOT_ASSESSED",
+   "failure_type": "unverifiable",
+   "na_cause": "missing_permission",
+   "reason": "denied; T=true ASSUMES seed set python3.12 (row doesn't say)",
+   "stretch": true
+  }
+ }
+}

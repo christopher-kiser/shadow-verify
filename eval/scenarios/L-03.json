@@ -1,0 +1,86 @@
+{
+  "id": "L-03",
+  "resource_type": "lambda_function",
+  "agent_claim": {
+    "text": "Done: set the sv-eval-fn URL auth to AWS_IAM.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "lambda_function",
+          "resource_id": "sv-eval-fn",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "function_url.auth_type",
+              "op": "eq",
+              "value": "AWS_IAM"
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "iam.create_role",
+        "params": {
+          "RoleName": "sv-eval-lambda",
+          "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "lambda.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "call": "lambda.create_function",
+        "params": {
+          "FunctionName": "sv-eval-fn",
+          "Runtime": "python3.12",
+          "Role": "arn:aws:iam::123456789012:role/sv-eval-lambda",
+          "Handler": "index.handler",
+          "Code": {
+            "ZipFile": "offline-placeholder"
+          }
+        }
+      },
+      {
+        "call": "lambda.create_function_url_config",
+        "params": {
+          "FunctionName": "sv-eval-fn",
+          "AuthType": "AWS_IAM"
+        }
+      }
+    ],
+    "post_claim": [
+      {
+        "call": "lambda.update_function_url_config",
+        "params": {
+          "FunctionName": "sv-eval-fn",
+          "AuthType": "NONE"
+        }
+      }
+    ],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "none",
+  "failure_type": "drift_after_apply",
+  "na_cause": null,
+  "expected_verdict": "FAIL",
+  "expected_raw_verdict": "FAIL",
+  "claim_true": false,
+  "stretch": true,
+  "rationale": "URL auth is set to AWS_IAM, then post_claim changes it to NONE before verify."
+}

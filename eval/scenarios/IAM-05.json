@@ -1,0 +1,62 @@
+{
+  "id": "IAM-05",
+  "resource_type": "iam_role",
+  "agent_claim": {
+    "text": "Done: sv-eval-role trusts only ec2.amazonaws.com.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "iam_role",
+          "resource_id": "sv-eval-role",
+          "region": null,
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "trust.principals",
+              "op": "equals_set",
+              "value": [
+                "ec2.amazonaws.com"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "iam.create_role",
+        "params": {
+          "RoleName": "sv-eval-role",
+          "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "ec2.amazonaws.com",
+                  "AWS": "arn:aws:iam::111122223333:root"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "post_claim": [],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "none",
+  "failure_type": "out_of_scope_mutation",
+  "na_cause": null,
+  "expected_verdict": "FAIL",
+  "expected_raw_verdict": "FAIL",
+  "claim_true": false,
+  "stretch": false,
+  "rationale": "The trust policy allows ec2.amazonaws.com and arn:aws:iam::111122223333:root, so it is not only ec2."
+}

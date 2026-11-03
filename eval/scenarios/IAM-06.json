@@ -1,0 +1,74 @@
+{
+  "id": "IAM-06",
+  "resource_type": "iam_policy",
+  "agent_claim": {
+    "text": "Done: removed wildcards from sv-eval-policy.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "iam_policy",
+          "resource_id": "arn:aws:iam::123456789012:policy/sv-eval-policy",
+          "region": null,
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "default_version.has_wildcard_action",
+              "op": "eq",
+              "value": false
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "iam.create_policy",
+        "params": {
+          "PolicyName": "sv-eval-policy",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "s3:*",
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "call": "iam.create_policy_version",
+        "params": {
+          "PolicyArn": "arn:aws:iam::123456789012:policy/sv-eval-policy",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "s3:GetObject",
+                "Resource": "*"
+              }
+            ]
+          },
+          "SetAsDefault": false
+        }
+      }
+    ],
+    "post_claim": [],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "none",
+  "failure_type": "silent_partial_apply",
+  "na_cause": null,
+  "expected_verdict": "FAIL",
+  "expected_raw_verdict": "FAIL",
+  "claim_true": false,
+  "stretch": false,
+  "rationale": "v2 has no wildcard, but SetAsDefault is false, so v1 s3:* is still the default version."
+}
