@@ -1,0 +1,19 @@
+{
+ "version": 2,
+ "created": "2026-11-03",
+ "author": "Sentinel",
+ "supersedes": "H-01..H-10 (retired, possibly exposed)",
+ "files": {
+  "eval/heldout/HB-01.json": "0de5834d2c433470ff3aad4db637e89389a8f19dad1c7494071ecfc9bfbc12ca",
+  "eval/heldout/HB-02.json": "5e561ac2bdf3e8d32d75d7f25d870f9890484ca19d381048aa46d44830d4e6fd",
+  "eval/heldout/HB-03.json": "c83b3f9ae0958db4b515e6ba66ebcc8e672fc50e42499a4ed04b90592a1599ae",
+  "eval/heldout/HB-04.json": "c608ff8f573917c3df8bfb2022b7936f5e0c65a5e926430bf02cf9a307b91382",
+  "eval/heldout/HB-05.json": "fc1cd5515f1b6ed0f373befc358c09085c90ad2a346a79ccb201c97d745014ef",
+  "eval/heldout/HB-06.json": "538a170835d40a351e002d6b467011f2abe6494d8beb1443a78f7fdd869ef9dc",
+  "eval/heldout/HB-07.json": "bde602aa572de5f8bd03f7cd79a72b73e849e175877a30a7c6e60c3d8e66b23d",
+  "eval/heldout/HB-08.json": "da9aa6b92ac5283e9db5176ebe846d0f52841f7bd3bf911f53081c1189cf99fe",
+  "eval/heldout/HB-09.json": "21c41f1d75ba75303e5177915edab2a8072310cef556d932afce99be1f3f87d5",
+  "eval/heldout/HB-10.json": "a8f2136159e5dd3c68f535416e48ba3b95aea234717212c831c87b9744cefcd0"
+ },
+ "set_sha256": "69fda69f4d2716d9f5ece79724f13d415bee268fd40990db0b3d4ca147a3bb37"
+}
