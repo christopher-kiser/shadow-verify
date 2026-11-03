@@ -1,0 +1,175 @@
+name: Shadow Verify
+description: Compare AI-agent AWS claims to live read-only account state and publish the verdict.
+branding:
+  icon: shield
+  color: gray-dark
+
+inputs:
+  claims-file:
+    description: Path to the claims YAML or JSON file, relative to the workspace.
+    required: false
+    default: .shadow/claims.yaml
+  aws-region:
+    description: AWS region for regional calls such as EC2.
+    required: false
+    default: us-east-1
+  role-to-assume:
+    description: IAM role ARN to assume with GitHub OIDC. Leave empty to use ambient credentials.
+    required: false
+    default: ""
+  evidence-path:
+    description: Where to write the evidence bundle JSON.
+    required: false
+    default: shadow-verify-evidence.json
+  plan-file:
+    description: Optional terraform show -json file. Informational in v0.
+    required: false
+    default: ""
+  fail-on-not-assessed:
+    description: Fail the job when any claim is NOT ASSESSED. Default true so a check that cannot read AWS is not green.
+    required: false
+    default: "true"
+  comment-on-pr:
+    description: Post the verdict as a pull request comment.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install Shadow Verify
+      shell: bash
+      env:
+        SV_ACTION_PATH: ${{ github.action_path }}
+      run: python -m pip install "$SV_ACTION_PATH"
+
+    - name: Assume read-only role
+      if: inputs.role-to-assume != ''
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ inputs.role-to-assume }}
+        aws-region: ${{ inputs.aws-region }}
+        role-session-name: shadow-verify
+
+    - name: Check claims
+      id: verify
+      shell: bash
+      env:
+        SV_CLAIMS: ${{ inputs.claims-file }}
+        SV_REGION: ${{ inputs.aws-region }}
+        SV_EVIDENCE: ${{ inputs.evidence-path }}
+        SV_PLAN: ${{ inputs.plan-file }}
+        SV_STRICT: ${{ inputs.fail-on-not-assessed }}
+      run: |
+        set +e
+        args=(--claims "$SV_CLAIMS" --region "$SV_REGION" --evidence "$SV_EVIDENCE" --json)
+        if [ -n "$SV_PLAN" ]; then
+          args+=(--plan "$SV_PLAN")
+        fi
+        if [ "$SV_STRICT" = "true" ]; then
+          args+=(--fail-on-not-assessed)
+        fi
+        python -m shadow_verify "${args[@]}" > "$RUNNER_TEMP/shadow-verify.json"
+        code=$?
+        echo "code=$code" >> "$GITHUB_OUTPUT"
+        echo "result_path=$RUNNER_TEMP/shadow-verify.json" >> "$GITHUB_OUTPUT"
+        exit 0
+
+    - name: Write job summary
+      if: always()
+      shell: bash
+      env:
+        SV_RESULT: ${{ steps.verify.outputs.result_path }}
+      run: |
+        python - << 'PY'
+        import json
+        import os
+
+        path = os.environ.get("SV_RESULT", "")
+        summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+        try:
+            with open(path, encoding="utf-8") as handle:
+                report = json.load(handle)
+        except (OSError, json.JSONDecodeError) as exc:
+            text = f"## Shadow Verify\n\nNo report was written ({exc}).\n"
+        else:
+            counts = report["summary"]
+            lines = [
+                "## Shadow Verify",
+                "",
+                f"pass {counts['pass']} · fail {counts['fail']} · not assessed {counts['not_assessed']}",
+                "",
+                f"bundle `{report['bundle_sha256']}`",
+                "",
+            ]
+            for row in report["results"]:
+                lines.append(f"- **{row['verdict']}** `{row['id']}` — {row['statement']}")
+                for reason in row["reasons"]:
+                    lines.append(f"  - {reason}")
+            lines.append("")
+            lines.append("`agent_note` is untrusted and was not an input. Plan notes do not affect verdicts in v0.")
+            text = "\n".join(lines) + "\n"
+        if summary_path:
+            with open(summary_path, "a", encoding="utf-8") as handle:
+                handle.write(text)
+        PY
+
+    - name: Upload evidence bundle
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: shadow-verify-evidence
+        path: ${{ inputs.evidence-path }}
+        if-no-files-found: warn
+
+    - name: Comment on pull request
+      if: always() && inputs.comment-on-pr == 'true' && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      env:
+        SV_RESULT: ${{ steps.verify.outputs.result_path }}
+      with:
+        script: |
+          const fs = require("fs");
+          const report = JSON.parse(fs.readFileSync(process.env.SV_RESULT, "utf8"));
+          const counts = report.summary;
+          const lines = [
+            "### Shadow Verify",
+            "",
+            `pass ${counts.pass} · fail ${counts.fail} · not assessed ${counts.not_assessed}`,
+            "",
+            `bundle \`${report.bundle_sha256}\``,
+            "",
+          ];
+          for (const row of report.results) {
+            lines.push(`- **${row.verdict}** \`${row.id}\` — ${row.statement}`);
+            for (const reason of row.reasons) {
+              lines.push(`  - ${reason}`);
+            }
+          }
+          lines.push("");
+          lines.push("`agent_note` is untrusted and was not an input. Plan notes do not affect verdicts in v0.");
+          let body = lines.join("\n");
+          if (body.length > 60000) {
+            body = body.slice(0, 60000) + "\n\n_(truncated)_";
+          }
+          await github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body,
+          });
+
+    - name: Exit with the verifier status
+      shell: bash
+      env:
+        SV_CODE: ${{ steps.verify.outputs.code }}
+      run: |
+        case "$SV_CODE" in
+          0|1|2) exit "$SV_CODE" ;;
+          *) echo "unexpected verifier status: $SV_CODE" >&2; exit 2 ;;
+        esac

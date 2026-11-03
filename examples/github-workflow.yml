@@ -1,0 +1,26 @@
+# Example only. Copy to .github/workflows/shadow-verify.yml in the repo that
+# should be checked. This file is not wired up on shadow-verify itself.
+#
+# The role's policy is docs/IAM.md. The workflow needs id-token: write so
+# GitHub can assume that role. It does not need AWS keys in the repo.
+name: shadow-verify
+
+on:
+  pull_request:
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: christopher-kiser/shadow-verify@main
+        with:
+          claims-file: .shadow/claims.yaml
+          aws-region: us-east-1
+          role-to-assume: arn:aws:iam::123456789012:role/ShadowVerifyReadOnly
+          fail-on-not-assessed: "true"
