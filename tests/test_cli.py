@@ -11,6 +11,12 @@ from shadow_verify.report import render_summary
 from tests.helpers import REGION, S3_LOCKED
 
 _ACCOUNT_ID = re.compile(r"(?<!\d)\d{12}(?!\d)")
+_SHA256 = re.compile(r"\b[0-9a-f]{64}\b")
+
+
+def _assert_no_account_id(text: str) -> None:
+    assert "123456789012" not in text
+    assert _ACCOUNT_ID.search(_SHA256.sub("", text)) is None
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -310,8 +316,7 @@ def test_cli_reports_do_not_leak_account_ids(tmp_path, monkeypatch, capsys):
         code = run(args)
     human = capsys.readouterr().out
     assert code == 1
-    assert "123456789012" not in human
-    assert _ACCOUNT_ID.search(human) is None
+    _assert_no_account_id(human)
 
     with mock_aws():
         seed()
@@ -319,9 +324,5 @@ def test_cli_reports_do_not_leak_account_ids(tmp_path, monkeypatch, capsys):
     raw = capsys.readouterr().out
     assert code == 1
     report = json.loads(raw)
-    scrubbed = raw.replace(report["bundle_sha256"], "")
-    assert "123456789012" not in scrubbed
-    assert _ACCOUNT_ID.search(scrubbed) is None
-    summary = render_summary(report)
-    assert "123456789012" not in summary
-    assert _ACCOUNT_ID.search(summary) is None
+    _assert_no_account_id(raw)
+    _assert_no_account_id(render_summary(report))
