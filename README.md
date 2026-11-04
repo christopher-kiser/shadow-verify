@@ -104,7 +104,7 @@ python -m eval.report
 
 Raw Shadow Verify numbers come first. A second table is labeled "SV + eval fidelity gate (not the product)". v0 only reads S3 Block Public Access, whether a bucket policy is public, security-group `not_contains` forbids, and an IAM role when trust, attached policies, and `no_admin_star` are all present. Every other property or resource is NOT ASSESSED. Those coverage abstentions are listed apart from abstentions v0 earned by reading AWS. A property that was not read cannot PASS.
 
-The first scored run is MOCKED, moto 5.2.5, tool commit `ce1b1e4`, freeze `eval-freeze-v1` at `df422f3`. Core raw confusion (rows are labels): PASS 4/0/13, FAIL 1/10/13, NOT ASSESSED 1/0/12. Catch rate 0.417. False FAIL 0. Wrong PASS against the label: CF-01 and REG-01. Truth wrong-PASS: REG-01 only. Coverage misses (label PASS or FAIL, v0 could not read the claim): 26 core and 3 stretch. `always_not_assessed` has 0 wrong PASS; `self_report` has 37; `naive_exists` has 33. The full table is `eval/results/mocked/report.md`. The run exits 1 because REG-01 is a wrong PASS.
+The first scored run is MOCKED, moto 5.2.5, tool commit `44c8a1a`, freeze `eval-freeze-v1` at `df422f3`. Core raw confusion (rows are labels): PASS 4/0/13, FAIL 1/10/13, NOT ASSESSED 1/0/12. Catch rate 0.417. False FAIL 0. Wrong PASS against the label: CF-01 and REG-01. Truth wrong-PASS: REG-01 only. Coverage misses (label PASS or FAIL, v0 could not read the claim): 26 core and 3 stretch. `always_not_assessed` has 0 wrong PASS; `self_report` has 37; `naive_exists` has 33. The full table is `eval/results/mocked/report.md`. The run exits 1 because REG-01 is a wrong PASS.
 
 The held-out cases are not in this repo. `--heldout` checks the pin and does not run them.
 

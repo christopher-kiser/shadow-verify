@@ -596,7 +596,7 @@
   "determinism_ok": true,
   "freeze_commit": "df422f3372f1e041f7cbf9a7aa70509507555c65",
   "freeze_tag": "eval-freeze-v1",
-  "git_commit": "ce1b1e4a64830faabe3683a02f198b1b65136c9a",
+  "git_commit": "44c8a1a9932502448045e56fabe49e2da3c4339d",
   "headlines": {
     "correct_na": [
       "ACC-01",
@@ -716,8 +716,8 @@
   "heldout_ran": false,
   "label": "MOCKED",
   "latency_ms": {
-    "median": 0.4294604999586227,
-    "p95": 209.18987599998218
+    "median": 0.3878795000673563,
+    "p95": 189.6797819999847
   },
   "lock_sha256": "c67b9395475836809496c886138c82c9c930cc92609a98a2d8231382c635b3d1",
   "metrics_gated": {
@@ -968,7 +968,7 @@
   "platform": "Linux-6.12.94+-x86_64-with-glibc2.39",
   "python": "3.12.3",
   "read_only_ok": true,
-  "run_utc": "2026-11-04T15:58:51Z",
+  "run_utc": "2026-11-04T16:09:37Z",
   "scenario_author": "Christopher",
   "scenario_date": "2026-11-03",
   "set": "core+stretch",
@@ -1114,7 +1114,7 @@
     "NOT_ASSESSED": true,
     "PASS": true
   },
-  "tool_commit": "ce1b1e4a64830faabe3683a02f198b1b65136c9a",
+  "tool_commit": "44c8a1a9932502448045e56fabe49e2da3c4339d",
   "versions": {
     "boto3": "1.43.123",
     "botocore": "1.43.123",

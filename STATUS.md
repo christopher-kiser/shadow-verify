@@ -2,7 +2,7 @@
 
 ## Current state
 
-v0 is on main. The eval set is frozen at `eval-freeze-v1` (`df422f3`). The MOCKED harness scores that set through the v0 checkers and does not retune them. Properties v0 cannot read are NOT ASSESSED. The first scored run is committed at `eval/results/mocked/` against tool commit `ce1b1e4`. It exits 1 because REG-01 is a wrong PASS: v0 does not read region, and the public-access flags match.
+v0 is on main. The eval set is frozen at `eval-freeze-v1` (`df422f3`). The MOCKED harness scores that set through the v0 checkers and does not retune them. Properties v0 cannot read are NOT ASSESSED. The first scored run is committed at `eval/results/mocked/` against tool commit `44c8a1a`. It exits 1 because REG-01 is a wrong PASS: v0 does not read region, and the public-access flags match.
 
 ## Next step
 
@@ -85,4 +85,4 @@ No AWS account was used. moto supplied the bucket.
 - 2026-11-04 — A range entry with no CIDR is `unresolvable_source` (NOT ASSESSED). Reverting that match made tcp/22 from `0.0.0.0/0` PASS when the only range was a description. MOCKED `python3 -m pytest -q`: 114 passed, 1 skipped in 13.11s. CI for `4e8caee` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — Eval harness for the frozen set. Unsupported properties are NOT ASSESSED and are not given a PASS. MOCKED `python3 -m pytest -q`: 176 passed, 1 skipped in 18.25s.
 - 2026-11-04 — First MOCKED scored run of 54 core + 4 stretch, tool commit ce1b1e4, freeze eval-freeze-v1 at df422f3. Core catch rate 0.417, false FAIL 0, truth wrong-PASS REG-01, coverage misses 26 core and 3 stretch. Exit 1. Held-out cases were not run. Windows CI for this commit is not in yet.
-- 2026-11-04 — Sentinel review of the harness: the mismatch decision is ADR 027 (ADR 026 is the open legacy-manifest decision), the no-invent-checks decision is ADR 028, and the unused plot hook is gone. The scored verdicts are unchanged.
+- 2026-11-04 — Sentinel review of the harness: the mismatch decision is ADR 027 (ADR 026 is the open legacy-manifest decision), the no-invent-checks decision is ADR 028, and the unused plot hook is gone. Rescored at tool commit 44c8a1a. Verdicts match the previous run. Evidence hashes changed because the bundle records that commit. Latency and run_utc changed. Exit 1 is still REG-01.

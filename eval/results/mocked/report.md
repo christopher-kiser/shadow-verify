@@ -3,7 +3,7 @@
 author-designed scenarios, not real agent traces.
 
 Mode: MOCKED. moto 5.2.5.
-tool_commit: ce1b1e4a64830faabe3683a02f198b1b65136c9a
+tool_commit: 44c8a1a9932502448045e56fabe49e2da3c4339d
 freeze: eval-freeze-v1 @ df422f3372f1e041f7cbf9a7aa70509507555c65
 set_sha256: 7b4cd4f1e447f0cee054c32aeaa5eafef3a670bd2e671b38f9316f69aa4af113
 held-out pin: 69fda69f4d2716d9f5ece79724f13d415bee268fd40990db0b3d4ca147a3bb37 (not run)
