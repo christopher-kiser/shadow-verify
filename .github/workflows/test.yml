@@ -1,7 +1,7 @@
 # Unit tests only. This does not call AWS.
-# bb2da38 was green on ubuntu-latest and windows-latest:
-# https://github.com/christopher-kiser/shadow-verify/actions/runs/41829270885
-# https://github.com/christopher-kiser/shadow-verify/actions/runs/41829279678
+# 50d5a72 was green on ubuntu-latest and windows-latest:
+# https://github.com/christopher-kiser/shadow-verify/actions/runs/41830360841
+# https://github.com/christopher-kiser/shadow-verify/actions/runs/41830369070
 name: tests
 
 on:
