@@ -11,9 +11,9 @@ from shadow_verify.errors import ClaimsError
 from shadow_verify.models import Claim
 from shadow_verify.yaml_subset import load_yaml_subset
 
-# Commercial regions (us-east-1) and gov regions (us-gov-west-1). Legacy "EU"
+# After lowercasing: us-east-1, us-gov-west-1, us-iso-east-1. Legacy "EU"
 # is a GetBucketLocation response, not a claim value.
-_REGION_FORMAT = re.compile(r"^[a-z]{2}(-gov)?-[a-z]+-\d$")
+_REGION_FORMAT = re.compile(r"^[a-z]{2}(-[a-z]+)+-\d+$")
 _CLAIM_FIELDS = {
     "id",
     "statement",
@@ -105,14 +105,14 @@ def _parse_claim(entry: object, seen: set[str]) -> Claim:
     if region is not None:
         if not isinstance(region, str) or not region.strip():
             raise ClaimsError(f"claim {claim_id!r} region must be a non-empty string")
-        region = region.strip()
+        region = region.strip().lower()
         if resource_type != "s3_bucket":
             raise ClaimsError(
                 f"claim {claim_id!r} region is only checked for s3_bucket, not {resource_type}"
             )
         if _REGION_FORMAT.fullmatch(region) is None:
             raise ClaimsError(
-                f"claim {claim_id!r} region must look like us-east-1 or us-gov-west-1"
+                f"claim {claim_id!r} region must look like us-east-1"
             )
     return Claim(
         id=claim_id,

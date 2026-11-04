@@ -6,9 +6,12 @@ import boto3
 import pytest
 from moto import mock_aws
 
+from shadow_verify.checkers.s3_bucket import S3BucketChecker
 from shadow_verify.cli import run
 from shadow_verify.errors import ClaimsError
 from shadow_verify.claims import load_claims
+from shadow_verify.models import Verdict
+from tests.helpers import aws_stack
 
 _SSH = {
     "ingress_forbidden": [
@@ -142,13 +145,41 @@ def test_iam_role_region_does_not_pass(tmp_path, capsys):
     assert "placed" in captured.err
 
 
-@pytest.mark.parametrize("region", ["us-east-1", "eu-west-1", "us-gov-west-1", "ap-southeast-2"])
+@pytest.mark.parametrize(
+    "region",
+    ["us-east-1", "eu-west-1", "us-gov-west-1", "ap-southeast-2", "us-iso-east-1"],
+)
 def test_s3_region_format_is_accepted(region: str):
     claims = load_claims(_document("s3_bucket", "logs-prod", {"block_public_acls": True}, region), ".json")
     assert claims[0].region == region
 
 
-@pytest.mark.parametrize("region", ["EU", "US-EAST-1", "us-east", "not-a-region"])
+def test_uppercase_region_matches_the_bucket_and_does_not_fail():
+    loaded = load_claims(
+        _document("s3_bucket", "logs-prod", {"block_public_acls": True}, "US-EAST-1"),
+        ".json",
+    )[0]
+    assert loaded.region == "us-east-1"
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket="logs-prod")
+        s3.put_public_access_block(
+            Bucket="logs-prod",
+            PublicAccessBlockConfiguration={
+                "BlockPublicAcls": True,
+                "IgnorePublicAcls": True,
+                "BlockPublicPolicy": True,
+                "RestrictPublicBuckets": True,
+            },
+        )
+        aws, _evidence = aws_stack()
+        aws.region = "eu-west-1"
+        result = S3BucketChecker().check(loaded, aws)
+    assert result.verdict == Verdict.PASS
+    assert any("region is us-east-1" in reason for reason in result.reasons)
+
+
+@pytest.mark.parametrize("region", ["EU", "eu", "us-east", "not-a-region"])
 def test_s3_region_format_is_rejected(region: str):
     with pytest.raises(ClaimsError, match="region"):
         load_claims(_document("s3_bucket", "logs-prod", {"block_public_acls": True}, region), ".json")

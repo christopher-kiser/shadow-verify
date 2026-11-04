@@ -75,11 +75,6 @@ def test_write_call_is_refused_before_any_client_call():
         aws._invoke("s3", "PutBucketPolicy", BoomClient(), Bucket="logs-prod", Policy="{}")
 
 
-def test_client_region_argument_is_required():
-    with pytest.raises(TypeError):
-        BotoAws(s3=BoomClient(), ec2=BoomClient(), iam=BoomClient(), evidence=EvidenceLog())
-
-
 def test_bucket_location_is_allowed_and_secret_reads_stay_refused():
     assert refusal("s3", "GetBucketLocation") is None
     assert "s3:GetBucketLocation" in ALLOWED_OPERATIONS

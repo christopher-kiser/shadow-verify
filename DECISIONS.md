@@ -208,8 +208,8 @@ Superseded by ADR 022. The union-covers-the-whole-target rule let a partial over
 
 ## ADR 030 — 2026-11-04 — region is s3_bucket only
 
-**Decision.** `region` is accepted only on `s3_bucket`. Any other resource type that sets it is a `ClaimsError` at load time, which exits 3. A claim region must match `^[a-z]{2}(-gov)?-[a-z]+-\d$` (`us-east-1`, `us-gov-west-1`). The legacy `EU` value is accepted only as a `GetBucketLocation` response, where it means `eu-west-1`. The loader is the only place that validates the claim region.
+**Decision.** `region` is accepted only on `s3_bucket`. Any other resource type that sets it is a `ClaimsError` at load time, which exits 3. A claim region is lowercased, then it must match `^[a-z]{2}(-[a-z]+)+-\d+$`. `US-EAST-1` is stored as `us-east-1`. The legacy `EU` value is accepted only as a `GetBucketLocation` response, where it means `eu-west-1`. The loader is the only place that validates the claim region. A denied location read does not hide a contradicting property: FAIL still outranks NOT ASSESSED.
 
-**Reason.** A security group claim with `region: eu-west-1`, run in `us-east-1` against a group that exists there, PASSed. The field was stored and never read. That is a wrong PASS. `EU` and `US-EAST-1` are not names the checker compares.
+**Reason.** A security group claim with `region: eu-west-1`, run in `us-east-1` against a group that exists there, PASSed. The field was stored and never read. That is a wrong PASS. Comparing `US-EAST-1` to `us-east-1` without lowercasing would be a false FAIL. `EU` is not a name the checker compares.
 
 **Revisit when.** Another checker reads region. Until then, setting `region` on that type stays a load error.

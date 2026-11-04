@@ -158,6 +158,36 @@ def test_location_access_denied_is_not_assessed():
     stubber.assert_no_pending_responses()
 
 
+def test_denied_location_still_fails_when_a_flag_contradicts():
+    """FAIL outranks NOT ASSESSED. A denied location does not hide a false flag."""
+
+    s3 = boto3.client("s3", region_name=REGION)
+    stubber = Stubber(s3)
+    stubber.add_client_error(
+        "get_bucket_location",
+        service_error_code="AccessDenied",
+        service_message="denied",
+        expected_params={"Bucket": "logs-prod"},
+    )
+    contradicted = {
+        "PublicAccessBlockConfiguration": {
+            "BlockPublicAcls": False,
+            "IgnorePublicAcls": True,
+            "BlockPublicPolicy": True,
+            "RestrictPublicBuckets": True,
+        }
+    }
+    stubber.add_response("get_public_access_block", contradicted, {"Bucket": "logs-prod"})
+    stubber.activate()
+    aws, _evidence = aws_stack()
+    aws._s3 = s3
+    result = CHECKER.check(claim("s3_bucket", "logs-prod", {"block_public_acls": True}), aws)
+    assert result.verdict == Verdict.FAIL
+    assert any("AccessDenied" in reason for reason in result.reasons)
+    assert any("block_public_acls is false; expected true" in reason for reason in result.reasons)
+    stubber.assert_no_pending_responses()
+
+
 def test_omitted_region_defaults_to_the_run_region(tmp_path, capsys):
     claims = tmp_path / "claims.json"
     claims.write_text(

@@ -32,7 +32,7 @@ claims:
 | `expected` | yes | The properties to compare. Unknown keys are an error. |
 | `agent_note` | no | Untrusted model text. Recorded. Never an input to the verdict. |
 | `terraform_address` | no | Optional address in a `terraform show -json` plan. Informational in v0. |
-| `region` | no | S3 only. For `s3_bucket`, compared to `GetBucketLocation`. Omitted means the run `--region`. Any other `resource_type` that sets `region` is a claims error. The value matches `us-east-1` or `us-gov-west-1` (`^[a-z]{2}(-gov)?-[a-z]+-\d$`). The legacy `EU` code is not a claim value. |
+| `region` | no | S3 only. For `s3_bucket`, compared to `GetBucketLocation`. Omitted means the run `--region`. Any other `resource_type` that sets `region` is a claims error. The value is lowercased, then it must match `^[a-z]{2}(-[a-z]+)+-\d+$` (`US-EAST-1` becomes `us-east-1`). The legacy `EU` code is not a claim value. |
 
 An unknown `resource_type` is NOT ASSESSED. It is not a pass. Register a checker before a new type can pass. See `AGENTS.md`.
 
@@ -60,7 +60,7 @@ Check only the keys you list. At least one is required.
 
 The policy document is not parsed. Publicity is only the `IsPublic` boolean AWS returns. `NoSuchBucket` is NOT ASSESSED: the bucket is not there to read.
 
-The checker always reads `GetBucketLocation` and emits a `region` result. `LocationConstraint` `null` or `""` is `us-east-1`. `EU` is `eu-west-1`. That value must equal the claim `region`, or the run `--region` when `region` is omitted. A claim `region` is a normal region name such as `us-east-1` or `us-gov-west-1`, not the legacy `EU` response. A difference is FAIL and the reason contains `region_mismatch` with the expected and actual regions. AccessDenied or any other error on that call is NOT ASSESSED. It is not a PASS, and the read is not skipped.
+The checker always reads `GetBucketLocation` and emits a `region` result. `LocationConstraint` `null` or `""` is `us-east-1`. `EU` is `eu-west-1`. That value must equal the claim `region`, or the run `--region` when `region` is omitted. A claim `region` is lowercased and must look like `us-east-1` (`^[a-z]{2}(-[a-z]+)+-\d+$`). `US-EAST-1` is stored as `us-east-1`. The legacy `EU` response code is not a claim value. A difference is FAIL and the reason contains `region_mismatch` with the expected and actual regions. AccessDenied or any other error on that call is NOT ASSESSED for the region. It is not a PASS, and the read is not skipped. If another property contradicts the claim, the claim is still FAIL.
 
 `region` is rejected at load time on every resource type other than `s3_bucket`. v0 does not read it for those types, so accepting it would let the claim PASS without checking the region.
 
