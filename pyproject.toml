@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shadow-verify"
+version = "0.1.0"
+description = "Check AI coding agents' AWS claims against live, read-only account state."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [{ name = "Shadow Verify contributors" }]
+keywords = ["aws", "security", "verification", "agents"]
+dependencies = ["boto3>=1.34", "rfc8785==0.1.4"]
+
+[project.optional-dependencies]
+dev = ["pytest==9.2.0", "moto==5.2.5", "pip-audit==2.10.1"]
+
+[project.scripts]
+shadow-verify = "shadow_verify.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/christopher-kiser/shadow-verify"
+Documentation = "https://github.com/christopher-kiser/shadow-verify/blob/main/docs/CLAIMS.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+shadow_verify = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "src"]
+addopts = "--import-mode=importlib --strict-markers --strict-config"
+markers = [
+  "live: calls a real AWS account; skipped unless SV_LIVE=1",
+]
