@@ -69,7 +69,7 @@ def scan_role_admin(
         PropertyResult(
             name="no_admin_star",
             verdict=Verdict.PASS,
-            reason="no Allow statement grants Action * or *:* on Resource *",
+            reason="no Allow statement grants Action * or *:* on all resources",
         ),
         evidence_ids,
     )

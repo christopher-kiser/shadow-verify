@@ -79,7 +79,7 @@ This checker does not prove least privilege. It proves the listed forbids are ab
 
 ## `iam_role`
 
-`identifier` is the role name, or a role ARN (`arn:aws:iam::123456789012:role/team/app-deploy` uses the name after the last `/`).
+`identifier` is the role name, or a role ARN (`arn:aws:iam::123456789012:role/team/app-deploy` uses the name after the last `/`). When the identifier is an ARN, the partition and account are compared with `Role.Arn` from `GetRole`. If either differs, or that Arn cannot be read, the claim is NOT ASSESSED (`arn_mismatch`). The same-named role in the caller's account is not the claimed role.
 
 All three keys are required in v0:
 
@@ -96,7 +96,7 @@ expected:
 
 `attached_policy_arns` is the exact set of attached managed policy ARNs. Inline policy names are not part of that set.
 
-`no_admin_star` scans the trust policy, every inline policy, and the default version of every attached policy. It FAILs when an Allow statement has Action `*` or `*:*` and Resource `*`. A Deny statement does not count. `NotAction` or `NotResource` is NOT ASSESSED. An unreadable policy document is NOT ASSESSED. A non-admin inline policy does not, by itself, fail the ARN comparison.
+`no_admin_star` scans the trust policy, every inline policy, and the default version of every attached policy. It FAILs when an Allow statement has Action `*` or `*:*` on a resource pattern that matches every `arn:aws:` ARN, including `*`, `arn:aws:*:*:*:*`, `arn:*:*:*:*:*`, and `arn:aws:*`. An Allow of `iam:*`, `iam:Put*Policy`, `iam:Attach*Policy`, `iam:CreatePolicyVersion`, `iam:PassRole`, or another wildcard that matches one of those actions, on all resources, is NOT ASSESSED (`may_grant_admin`). A Deny statement does not count. `NotAction` or `NotResource` is NOT ASSESSED. An unreadable policy document is NOT ASSESSED. A non-admin inline policy does not, by itself, fail the ARN comparison.
 
 ## YAML subset
 
