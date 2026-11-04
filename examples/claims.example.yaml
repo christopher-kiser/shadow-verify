@@ -6,6 +6,7 @@ claims:
     statement: S3 bucket locked down
     resource_type: s3_bucket
     identifier: logs-prod
+    region: us-east-1
     agent_note: Agent says public access is blocked.
     terraform_address: aws_s3_bucket.logs
     expected:

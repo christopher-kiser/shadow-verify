@@ -12,6 +12,11 @@ Rules, in order, for each key present under ``expected``:
   ``PolicyStatus.IsPublic``. ``NoSuchBucketPolicy`` is observed as not
   public. The policy document is not parsed. A second publicity algorithm
   would be a guess.
+* ``region`` is always read from ``GetBucketLocation``. The claim's
+  ``region`` is the expected value, or the run region when the claim omits
+  it. ``LocationConstraint`` ``None`` or ``""`` is ``us-east-1``. ``EU`` is
+  ``eu-west-1``. A difference is FAIL (``region_mismatch``). Any error
+  reading the location is NOT ASSESSED and is not skipped.
 
 ``NoSuchBucket`` stops the check: the bucket is not there to read.
 Any other error on a requested property is NOT ASSESSED for that property.
@@ -20,7 +25,7 @@ Any other error on a requested property is NOT ASSESSED for that property.
 from __future__ import annotations
 
 from shadow_verify.aws import BotoAws
-from shadow_verify.checkers.base import blocked, call_failure, compare_bool, finish
+from shadow_verify.checkers.base import call_failure, compare_bool, finish
 from shadow_verify.errors import ClaimsError
 from shadow_verify.models import CheckResult, Claim, PropertyResult, Verdict
 
@@ -41,24 +46,92 @@ class S3BucketChecker:
 
     def check(self, claim: Claim, aws: BotoAws) -> CheckResult:
         expected = _validate(claim)
+        expected_region = _expected_region(claim, aws)
         evidence_ids: list[str] = []
         properties: list[PropertyResult] = []
+        location = aws.get_bucket_location(claim.identifier)
+        evidence_ids.append(location.id)
+        properties.append(_region_result(location, expected_region))
+        if location.error_code == _NO_BUCKET:
+            return finish(claim, properties, evidence_ids)
         wants_pab = any(name in expected for name, _field in _PAB_FIELDS)
         if wants_pab:
             item = aws.get_public_access_block(claim.identifier)
             evidence_ids.append(item.id)
             if item.error_code == _NO_BUCKET:
-                return blocked(
-                    claim,
-                    f"GetPublicAccessBlock failed: {_NO_BUCKET}: bucket is not visible",
-                    evidence_ids,
+                properties.append(
+                    PropertyResult(
+                        name="read",
+                        verdict=Verdict.NOT_ASSESSED,
+                        reason=f"GetPublicAccessBlock failed: {_NO_BUCKET}: bucket is not visible",
+                    )
                 )
+                return finish(claim, properties, evidence_ids)
             properties.extend(_public_access_block(item, expected))
         if "bucket_policy_public" in expected:
             item = aws.get_bucket_policy_status(claim.identifier)
             evidence_ids.append(item.id)
             properties.append(_policy_public(item, bool(expected["bucket_policy_public"])))
         return finish(claim, properties, evidence_ids)
+
+
+def _expected_region(claim: Claim, aws: BotoAws) -> str:
+    if claim.region is not None:
+        if not isinstance(claim.region, str) or not claim.region.strip():
+            raise ClaimsError(f"s3_bucket claim {claim.id!r} region must be a non-empty string")
+        return claim.region.strip()
+    region = getattr(aws, "region", None)
+    if not isinstance(region, str) or not region.strip():
+        raise ClaimsError(
+            f"s3_bucket claim {claim.id!r} has no region; set region or pass --region"
+        )
+    return region.strip()
+
+
+def _normalize_location(value: object) -> str | None:
+    """Map a GetBucketLocation constraint to a region name.
+
+    ``None`` and ``""`` are the legacy us-east-1 values. ``EU`` is eu-west-1.
+    Any other non-string is not understood.
+    """
+
+    if value is None or value == "":
+        return "us-east-1"
+    if not isinstance(value, str):
+        return None
+    if value == "EU":
+        return "eu-west-1"
+    return value
+
+
+def _region_result(item, expected: str) -> PropertyResult:
+    if not item.ok:
+        return PropertyResult(
+            name="region",
+            verdict=Verdict.NOT_ASSESSED,
+            reason=call_failure("GetBucketLocation", item),
+        )
+    response = item.view.get("response")
+    if not isinstance(response, dict):
+        return PropertyResult(
+            name="region",
+            verdict=Verdict.NOT_ASSESSED,
+            reason="GetBucketLocation response is not an object",
+        )
+    actual = _normalize_location(response.get("LocationConstraint"))
+    if actual is None:
+        return PropertyResult(
+            name="region",
+            verdict=Verdict.NOT_ASSESSED,
+            reason="GetBucketLocation response has no usable LocationConstraint",
+        )
+    if actual == expected:
+        return PropertyResult(name="region", verdict=Verdict.PASS, reason=f"region is {actual}")
+    return PropertyResult(
+        name="region",
+        verdict=Verdict.FAIL,
+        reason=f"region_mismatch: region is {actual}; expected {expected}",
+    )
 
 
 def _validate(claim: Claim) -> dict:

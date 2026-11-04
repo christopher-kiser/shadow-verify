@@ -56,6 +56,7 @@ def test_plan_missing_address_is_reported(tmp_path):
 
 def test_allowlist_is_exact_pairs_not_verb_prefixes():
     assert ALLOWED_OPERATIONS == {
+        "s3:GetBucketLocation",
         "s3:GetPublicAccessBlock",
         "s3:GetBucketPolicyStatus",
         "ec2:DescribeSecurityGroups",

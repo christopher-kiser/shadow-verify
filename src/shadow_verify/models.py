@@ -28,6 +28,7 @@ class Claim:
     expected: dict[str, Any]
     agent_note: str | None = None
     terraform_address: str | None = None
+    region: str | None = None
 
 
 @dataclass(frozen=True)

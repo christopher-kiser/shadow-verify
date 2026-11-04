@@ -151,6 +151,13 @@ def test_injected_session_and_clock(tmp_path, capsys):
     events: list[tuple] = []
 
     class DenyS3:
+        def get_bucket_location(self, **kwargs):
+            events.append(("GetBucketLocation", kwargs))
+            raise ClientError(
+                {"Error": {"Code": "AccessDenied", "Message": "no"}, "ResponseMetadata": {"HTTPStatusCode": 403}},
+                "GetBucketLocation",
+            )
+
         def get_public_access_block(self, **kwargs):
             events.append(("GetPublicAccessBlock", kwargs))
             raise ClientError(
@@ -194,6 +201,7 @@ def test_injected_session_and_clock(tmp_path, capsys):
     bundle = json.loads(evidence.read_text(encoding="utf-8"))
     assert bundle["generated_at"] == "2026-11-03T06:00:00+00:00"
     assert ("client", "s3", REGION) in events
+    assert ("GetBucketLocation", {"Bucket": "logs-prod"}) in events
     assert ("GetPublicAccessBlock", {"Bucket": "logs-prod"}) in events
     assert ("GetBucketPolicyStatus", {"Bucket": "logs-prod"}) in events
 

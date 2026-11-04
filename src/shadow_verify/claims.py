@@ -18,6 +18,7 @@ _CLAIM_FIELDS = {
     "expected",
     "agent_note",
     "terraform_address",
+    "region",
 }
 
 
@@ -96,6 +97,11 @@ def _parse_claim(entry: object, seen: set[str]) -> Claim:
     address = entry.get("terraform_address")
     if address is not None and not isinstance(address, str):
         raise ClaimsError(f"claim {claim_id!r} terraform_address must be a string")
+    region = entry.get("region")
+    if region is not None:
+        if not isinstance(region, str) or not region.strip():
+            raise ClaimsError(f"claim {claim_id!r} region must be a non-empty string")
+        region = region.strip()
     return Claim(
         id=claim_id,
         statement=statement,
@@ -104,4 +110,5 @@ def _parse_claim(entry: object, seen: set[str]) -> Claim:
         expected=dict(expected),
         agent_note=agent_note,
         terraform_address=address,
+        region=region,
     )

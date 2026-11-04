@@ -15,6 +15,7 @@ claims:
     statement: S3 bucket locked down
     resource_type: s3_bucket
     identifier: logs-prod
+    region: us-east-1
     agent_note: Agent says public access is blocked.
     terraform_address: aws_s3_bucket.logs
     expected:
@@ -31,6 +32,7 @@ claims:
 | `expected` | yes | The properties to compare. Unknown keys are an error. |
 | `agent_note` | no | Untrusted model text. Recorded. Never an input to the verdict. |
 | `terraform_address` | no | Optional address in a `terraform show -json` plan. Informational in v0. |
+| `region` | no | Region the resource must be in. For `s3_bucket`, compared to `GetBucketLocation`. Omitted means the run `--region`. |
 
 An unknown `resource_type` is NOT ASSESSED. It is not a pass. Register a checker before a new type can pass. See `AGENTS.md`.
 
@@ -57,6 +59,8 @@ Check only the keys you list. At least one is required.
 `NoSuchBucketPolicy` means there is no bucket policy, so `bucket_policy_public` is observed as `false`.
 
 The policy document is not parsed. Publicity is only the `IsPublic` boolean AWS returns. `NoSuchBucket` is NOT ASSESSED: the bucket is not there to read.
+
+The checker always reads `GetBucketLocation` and emits a `region` result. `LocationConstraint` `null` or `""` is `us-east-1`. `EU` is `eu-west-1`. That value must equal the claim `region`, or the run `--region` when `region` is omitted. A difference is FAIL and the reason contains `region_mismatch` with the expected and actual regions. AccessDenied or any other error on that call is NOT ASSESSED. It is not a PASS, and the read is not skipped.
 
 ## `ec2_security_group`
 

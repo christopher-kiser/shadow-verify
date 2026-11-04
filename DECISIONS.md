@@ -197,3 +197,11 @@ Superseded by ADR 022. The union-covers-the-whole-target rule let a partial over
 **Reason.** Skipping a description-only range let tcp/22 from `0.0.0.0/0` pass when the only entry was `{"Description": "x"}`.
 
 **Revisit when.** The API shape for a range without a CIDR is rejected before this checker sees it.
+
+## ADR 029 — 2026-11-04 — S3 region is GetBucketLocation
+
+**Decision.** An `s3_bucket` claim has an optional `region`. When it is omitted, the expected region is the run `--region`. The checker always calls `GetBucketLocation` and emits a `region` property. `LocationConstraint` `null` or `""` is `us-east-1`. `EU` is `eu-west-1`. A different region is FAIL (`region_mismatch`), and the reason names the expected and actual regions. Any error from that call is NOT ASSESSED. The error is not skipped, and it does not hide a contradiction on another property. A `LocationConstraint` on an error response is not a region. The call is allowlisted as `s3:GetBucketLocation`.
+
+**Reason.** `GetPublicAccessBlock` follows the bucket redirect, so a bucket in `us-west-2` matched a `us-east-1` run and the claim PASSed. The run region only selected the client endpoint. moto 5.2.5 also puts `LocationConstraint: null` on a `NoSuchBucket` error; treating that null as `us-east-1` would be another wrong PASS.
+
+**Revisit when.** A security group needs the same explicit region property. EC2 does not follow a cross-region redirect, so a group that exists only in another region stays NOT ASSESSED until an absence claim exists.
