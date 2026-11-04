@@ -71,9 +71,9 @@ expected:
       cidr: 0.0.0.0/0
 ```
 
-`protocol` is `tcp`, `udp`, `icmp`, `icmpv6`, `all`, or `-1`. `all` and `-1` are the same claim. Ports are required even for `-1`, so the range is explicit. Observed protocol numbers `6`, `17`, and `58` are tcp, udp, and icmpv6.
+`protocol` is `tcp`, `udp`, `icmp`, `icmpv6`, `all`, or `-1`. `all` and `-1` are the same claim. Ports are required even for `-1`, so the range is explicit. Observed protocol numbers `1`, `6`, `17`, and `58` are icmp, tcp, udp, and icmpv6. For ICMP, `from_port`/`to_port` in the claim are the type range. The observed `FromPort` is the type and is compared to that range; the observed code (`ToPort`) is ignored. Type `-1` matches every ICMP forbid.
 
-Each source in one ingress permission is judged on its own. A forbid of `0.0.0.0/0` or `::/0` means open to the internet, for both address families: it fails if any matching CIDR overlaps a globally routable address. Any other forbid fails on any CIDR overlap. Protocol numbers `6`, `17`, and `58` are tcp, udp, and icmpv6. Missing ports, and ICMP type `-1` code `-1`, mean every port or every ICMP type. A prefix list or security-group source on that port and protocol is `unresolvable_source` (NOT ASSESSED) unless a CIDR on the same permission already fails.
+Each source in one ingress permission is judged on its own. A forbid of `0.0.0.0/0` or `::/0` means open to the internet, for both address families: it fails if any matching CIDR overlaps a globally routable address. Any other forbid fails on any CIDR overlap. Protocol numbers `1`, `6`, `17`, and `58` are icmp, tcp, udp, and icmpv6. Missing ports mean every port. An ICMP type of `-1` matches every ICMP forbid; the ICMP code is ignored. A prefix list or security-group source on that port and protocol is `unresolvable_source` (NOT ASSESSED) unless a CIDR on the same permission already fails.
 
 This checker does not prove least privilege. It proves the listed forbids are absent.
 

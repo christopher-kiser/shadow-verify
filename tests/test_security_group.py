@@ -1,4 +1,5 @@
 import boto3
+import pytest
 from botocore.stub import Stubber
 from moto import mock_aws
 
@@ -376,20 +377,91 @@ def test_disjoint_private_ranges_pass():
     assert result.verdict == Verdict.PASS, result.reasons
 
 
-def test_protocol_number_6_is_tcp():
-    with mock_aws():
-        group_id = _group(
-            [
-                {
-                    "IpProtocol": "6",
-                    "FromPort": 22,
-                    "ToPort": 22,
-                    "IpRanges": [{"CidrIp": "8.8.8.8/32"}],
-                }
-            ]
-        )
+_STUB_GROUP = "sg-0123456789abcdef0"
+
+
+def _check_raw_permission(permission: dict, forbid: dict):
+    """DescribeSecurityGroups via Stubber, so moto cannot rewrite IpProtocol."""
+
+    ec2 = boto3.client("ec2", region_name=REGION)
+    stubber = Stubber(ec2)
+    stubber.add_response(
+        "describe_security_groups",
+        {"SecurityGroups": [{"GroupId": _STUB_GROUP, "IpPermissions": [permission]}]},
+        expected_params={"GroupIds": [_STUB_GROUP]},
+    )
+    stubber.activate()
+    try:
         aws, _evidence = aws_stack()
-        result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
+        aws._ec2 = ec2
+        result = CHECKER.check(
+            claim(
+                "ec2_security_group",
+                _STUB_GROUP,
+                {"ingress_forbidden": [forbid]},
+            ),
+            aws,
+        )
+        stubber.assert_no_pending_responses()
+        return result
+    finally:
+        stubber.deactivate()
+
+
+def _world_permission(protocol: str, from_port: int, to_port: int) -> dict:
+    return {
+        "IpProtocol": protocol,
+        "FromPort": from_port,
+        "ToPort": to_port,
+        "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
+    }
+
+
+@pytest.mark.parametrize(
+    ("from_port", "to_port", "forbid_from", "forbid_to", "expected"),
+    [
+        (8, -1, 0, 255, Verdict.FAIL),
+        (8, 0, 8, 8, Verdict.FAIL),
+        (3, 4, 8, 8, Verdict.PASS),
+    ],
+)
+def test_icmp_type_matches_and_code_is_ignored(
+    from_port, to_port, forbid_from, forbid_to, expected
+):
+    result = _check_raw_permission(
+        _world_permission("icmp", from_port, to_port),
+        {
+            "protocol": "icmp",
+            "from_port": forbid_from,
+            "to_port": forbid_to,
+            "cidr": "0.0.0.0/0",
+        },
+    )
+    assert result.verdict == expected, result.reasons
+
+
+@pytest.mark.parametrize(
+    ("number", "protocol", "from_port", "to_port"),
+    [
+        ("6", "tcp", 22, 22),
+        ("17", "udp", 53, 53),
+        ("1", "icmp", 0, 255),
+    ],
+)
+def test_raw_ip_protocol_numbers(number, protocol, from_port, to_port):
+    permission = _world_permission(number, from_port, to_port)
+    if number == "1":
+        permission["FromPort"] = -1
+        permission["ToPort"] = -1
+    result = _check_raw_permission(
+        permission,
+        {
+            "protocol": protocol,
+            "from_port": from_port,
+            "to_port": to_port,
+            "cidr": "0.0.0.0/0",
+        },
+    )
     assert result.verdict == Verdict.FAIL, result.reasons
 
 

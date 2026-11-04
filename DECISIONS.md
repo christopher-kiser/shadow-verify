@@ -168,8 +168,16 @@ Superseded by ADR 022. The union-covers-the-whole-target rule let a partial over
 
 ## ADR 022 — 2026-11-03 — Internet exposure is overlap, not full cover
 
-**Decision.** Supersedes ADR 018. A forbid of `0.0.0.0/0` or `::/0` means open to the internet, for both address families. It fails if any matching CIDR overlaps a globally routable address. That check uses the pinned non-global ranges in `checkers/routable.py` (RFC 1918, `100.64.0.0/10`, `127.0.0.0/8`, `169.254.0.0/16`, `fc00::/7`, `fe80::/10`, `::1/128`). It does not call `is_global` on the whole prefix. Any other forbid fails on any overlap. Each source inside one `IpPermissions` entry is split first. A prefix list or security-group source on that port and protocol is NOT ASSESSED (`unresolvable_source`) unless a CIDR already fails. Missing ports mean every port. Protocol numbers `6`, `17`, and `58` are tcp, udp, and icmpv6. ICMP type `-1` code `-1` matches any ICMP forbid.
+**Decision.** Supersedes ADR 018. A forbid of `0.0.0.0/0` or `::/0` means open to the internet, for both address families. It fails if any matching CIDR overlaps a globally routable address. That check uses the pinned non-global ranges in `checkers/routable.py` (RFC 1918, `100.64.0.0/10`, `127.0.0.0/8`, `169.254.0.0/16`, `fc00::/7`, `fe80::/10`, `::1/128`). It does not call `is_global` on the whole prefix. Any other forbid fails on any overlap. Each source inside one `IpPermissions` entry is split first. A prefix list or security-group source on that port and protocol is NOT ASSESSED (`unresolvable_source`) unless a CIDR already fails. Missing ports mean every port. Protocol numbers `6`, `17`, and `58` are tcp, udp, and icmpv6. ICMP type matching is ADR 023.
 
 **Reason.** Full-cover let `0.0.0.0/1` pass a world forbid. A world forbid that looked at only one address family let `::/0` pass a forbid of `0.0.0.0/0`. Merged sources hid a public CIDR next to a prefix list.
 
 **Revisit when.** Prefix lists are resolved with `GetManagedPrefixListEntries`, or the non-global list needs another range.
+
+## ADR 023 — 2026-11-04 — ICMP matches on type, and protocol 1 is icmp
+
+**Decision.** For `icmp` and `icmpv6`, `FromPort` is the type and `ToPort` (the code) is ignored. The permission matches when `FromPort` is absent, `FromPort` is `-1`, or `FromPort` falls inside the forbid's type range. Protocol number `1` is icmp, beside `6` (tcp), `17` (udp), and `58` (icmpv6).
+
+**Reason.** Treating type and code as a port range let echo type 8 with code 0 or code -1 pass a forbid of that type. A raw `IpProtocol` of `1` would pass an ICMP forbid if the number map omitted it.
+
+**Revisit when.** A claim needs to forbid one ICMP code.

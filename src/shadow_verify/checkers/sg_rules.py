@@ -12,7 +12,8 @@ from typing import Any
 from shadow_verify.checkers.routable import is_world, overlaps_globally_routable
 from shadow_verify.models import PropertyResult, Verdict
 
-_NUMBERS = {"6": "tcp", "17": "udp", "58": "icmpv6"}
+_NUMBERS = {"1": "icmp", "6": "tcp", "17": "udp", "58": "icmpv6"}
+_ICMP = {"icmp", "icmpv6"}
 
 
 def assess_forbid(index: int, rule: dict[str, Any], permissions: list) -> PropertyResult:
@@ -149,6 +150,8 @@ def _norm_protocol(value: object) -> str | None:
 
 
 def _ports_overlap(permission: dict, rule: dict[str, Any]) -> str:
+    if _norm_protocol(permission.get("IpProtocol")) in _ICMP:
+        return _icmp_type_matches(permission, rule)
     if "FromPort" not in permission and "ToPort" not in permission:
         return "yes"
     try:
@@ -159,5 +162,21 @@ def _ports_overlap(permission: dict, rule: dict[str, Any]) -> str:
     if start == -1 and end == -1:
         return "yes"
     if start <= rule["to_port"] and end >= rule["from_port"]:
+        return "yes"
+    return "no"
+
+
+def _icmp_type_matches(permission: dict, rule: dict[str, Any]) -> str:
+    """FromPort is the type. ToPort is the code and is ignored."""
+
+    if "FromPort" not in permission:
+        return "yes"
+    try:
+        icmp_type = int(permission["FromPort"])
+    except (TypeError, ValueError):
+        return "unknown"
+    if icmp_type == -1:
+        return "yes"
+    if rule["from_port"] <= icmp_type <= rule["to_port"]:
         return "yes"
     return "no"

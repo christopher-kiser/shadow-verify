@@ -4,9 +4,11 @@
 by any ingress permission. A permission covers a forbidden rule when:
 
 * its protocol is all (``-1``), or it equals the forbidden protocol
-  after ``6``, ``17``, and ``58`` are read as tcp, udp, and icmpv6
-* its ports overlap the forbid; missing ports and ICMP type ``-1``
-  code ``-1`` mean every port or every ICMP type
+  after ``1``, ``6``, ``17``, and ``58`` are read as icmp, tcp, udp,
+  and icmpv6
+* its ports overlap the forbid; missing ports mean every port.
+  For ICMP, FromPort is the type and ToPort (the code) is ignored.
+  Type ``-1``, or a type inside the forbid's range, matches
 * a forbid of ``0.0.0.0/0`` or ``::/0`` means open to the internet,
   for both address families: any CIDR that overlaps a globally routable
   address fails it
