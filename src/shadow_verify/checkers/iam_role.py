@@ -8,14 +8,14 @@ A claim must set all three:
   bundle still contains them.
 * ``attached_policy_arns``: the exact set of attached managed policy ARNs.
   Inline policy names are not part of this set.
-* ``no_admin_star: true``: no Allow statement in the trust policy, an
-  inline policy, or an attached policy's default version has Action
-  ``*`` or ``*:*`` on a resource pattern that matches every ``arn:aws:``
-  ARN. ``iam:*``, ``iam:Put*Policy``, ``iam:Attach*Policy``,
-  ``iam:CreatePolicyVersion``, ``iam:PassRole``, or a wildcard that
-  matches one of those, on all resources, is NOT ASSESSED
-  (``may_grant_admin``). ``NotAction`` or ``NotResource`` makes this
-  property NOT ASSESSED. v0 does not try to interpret them.
+* ``no_admin_star: true``: no unconditional Allow of ``*`` or ``*:*``,
+  and no NotAction, on a resource pattern that matches every ARN in a
+  partition. Action names are compared case-insensitively. IAM-write
+  wildcards on those resources are NOT ASSESSED (``may_grant_admin``).
+  Any other NotAction or NotResource is NOT ASSESSED
+  (``not_action_unsupported``). An otherwise-admin Allow that also has
+  a Condition is NOT ASSESSED (``condition_unsupported``). A Deny does
+  not cancel an Allow.
 
 When ``identifier`` is a role ARN, its partition and account must match
 ``Role.Arn`` from ``GetRole``. A different account or partition is

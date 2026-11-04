@@ -1,8 +1,8 @@
 """Read inline and attached IAM policy documents and look for star admin.
 
-A document that cannot be read, or that uses NotAction or NotResource,
-is NOT ASSESSED. An Allow star statement is FAIL even if another document
-could not be read.
+A document that cannot be read is NOT ASSESSED. An unconditional admin
+Allow is FAIL even if another document could not be read and even if
+another statement is Deny.
 """
 
 from __future__ import annotations

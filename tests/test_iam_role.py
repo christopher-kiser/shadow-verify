@@ -168,7 +168,13 @@ def test_not_action_is_not_assessed():
             PolicyDocument=json.dumps(
                 {
                     "Version": "2012-10-17",
-                    "Statement": [{"Effect": "Allow", "NotAction": "iam:CreateUser", "Resource": "*"}],
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "NotAction": "iam:CreateUser",
+                            "Resource": "arn:aws:s3:::logs/*",
+                        }
+                    ],
                 }
             ),
         )

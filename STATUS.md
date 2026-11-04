@@ -2,7 +2,7 @@
 
 ## Current state
 
-v0 checks S3 public access, EC2 security group ingress, and IAM role trust, attached policies, and star-admin. A role ARN whose account or partition differs from `GetRole`'s `Arn` is NOT ASSESSED (`arn_mismatch`). An Allow of `*` or `*:*` on any resource pattern that matches every `arn:aws:` ARN is FAIL. `iam:*` and the other named privilege-escalation actions on all resources are NOT ASSESSED (`may_grant_admin`). Verdicts are PASS, FAIL, or NOT ASSESSED. Rules only. ADR 030.
+v0 checks S3 public access, EC2 security group ingress, and IAM role trust, attached policies, and star-admin. A role ARN whose account or partition differs from `GetRole`'s `Arn` is NOT ASSESSED (`arn_mismatch`). Unconditional admin Allows, including NotAction on every ARN in a partition, are FAIL. IAM-write wildcards are NOT ASSESSED (`may_grant_admin`). A Condition on an otherwise-admin Allow is NOT ASSESSED (`condition_unsupported`). A Deny does not cancel an Allow. Verdicts are PASS, FAIL, or NOT ASSESSED. Rules only. ADR 030.
 
 ## Next step
 
@@ -14,7 +14,7 @@ Local mocked run on Python 3.12.3 (Linux), 2026-11-04. Every AWS interaction in 
 
 ```
 python3 -m pytest -q
-150 passed, 1 skipped in 16.58s
+162 passed, 1 skipped in 16.34s
 ```
 
 MOCKED. The skip is `tests/test_live.py` because `SV_LIVE` is not set. Two mocked demo runs both exited 1 with `bundle_sha256` `39f3a4677a9830ced8d9b7ad7d325c0758e4783955832d46686381f62b5701b4`. `python -m pip_audit` in a clean virtualenv printed `No known vulnerabilities found`.
@@ -71,3 +71,4 @@ No AWS account was used. moto supplied the bucket.
 - 2026-11-04 — A forbid of `all` / `-1` covers every protocol, then ports or ICMP type. Reverting that match made the tcp/22 and icmp type 8 world cases PASS instead of FAIL. CGNAT `100.64.0.0/10` still passes a world forbid. The job summary escapes claim text. MOCKED `python3 -m pytest -q`: 113 passed, 1 skipped in 11.88s. CI for `50d5a72` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — A range entry with no CIDR is `unresolvable_source` (NOT ASSESSED). Reverting that match made tcp/22 from `0.0.0.0/0` PASS when the only range was a description. MOCKED `python3 -m pytest -q`: 114 passed, 1 skipped in 13.11s. CI for `4e8caee` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — IAM wrong-PASS: a role ARN in another account or partition is `arn_mismatch` (NOT ASSESSED), and all-resource admin patterns fail while `iam:*` on all resources is `may_grant_admin`. Breaking each check made the new tests PASS again (pytest exit 1). MOCKED `python3 -m pytest -q`: 150 passed, 1 skipped in 16.58s. Windows is not claimed from this machine. Next: review the pull request.
+- 2026-11-04 — Admin-equivalent IAM holes: NotAction on all resources is FAIL; other NotAction or NotResource is `not_action_unsupported`; IAM-write wildcards are case-insensitive `may_grant_admin`; `arn:aws-us-gov:*` and `arn:aws-cn:*:*:*:*` are all resources; a Condition on an otherwise-admin Allow is `condition_unsupported`; a Deny does not cancel an Allow. Each break-it exited 1. MOCKED `python3 -m pytest -q`: 162 passed, 1 skipped in 16.34s. Next: wait for Ubuntu and Windows CI on the pull request.

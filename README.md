@@ -94,7 +94,7 @@ S3 checks are the four public-access-block flags and `GetBucketPolicyStatus.IsPu
 
 An `iam_role` identifier that is an ARN is compared with `Role.Arn` from `GetRole`. A different account or partition is NOT ASSESSED (`arn_mismatch`). The caller's role of the same name was not the claimed role.
 
-`no_admin_star` FAILs an Allow of `*` or `*:*` when the resource pattern matches every `arn:aws:` ARN (`*`, `arn:aws:*:*:*:*`, `arn:*:*:*:*:*`, `arn:aws:*`, and any other pattern with that coverage). An Allow of `iam:*`, `iam:Put*Policy`, `iam:Attach*Policy`, `iam:CreatePolicyVersion`, `iam:PassRole`, or a wildcard that matches one of those, on all resources is NOT ASSESSED (`may_grant_admin`).
+`no_admin_star` FAILs an unconditional Allow of `*` or `*:*`, and an Allow NotAction, when the resource pattern matches every ARN in a partition (`aws`, `aws-us-gov`, `aws-cn`, or another literal partition). That includes `*`, `arn:aws:*:*:*:*`, `arn:*:*:*:*:*`, `arn:aws:*`, `arn:aws-us-gov:*`, and `arn:aws-cn:*:*:*:*`. Action names are matched without case. `*:*`, `*:Put*`, `iam:*Policy*`, `iam:Create*`, `iam:Update*`, `iam:*`, `iam:Put*Policy`, `iam:Attach*Policy`, `iam:CreatePolicyVersion`, and `iam:PassRole` on all resources are NOT ASSESSED when they are not the admin star (`may_grant_admin`). Any other Allow NotAction or NotResource is NOT ASSESSED (`not_action_unsupported`). An otherwise-admin Allow that also has a Condition is NOT ASSESSED (`condition_unsupported`), because the condition is not evaluated. A Deny statement does not cancel an Allow.
 
 ## Development
 

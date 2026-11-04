@@ -171,3 +171,74 @@ def test_admin_statement_outranks_privesc_statement():
         ]
     }
     assert admin_finding(document)[0] == "admin"
+
+
+def test_not_action_on_all_resources_fails():
+    document = {
+        "Statement": [
+            {"Effect": "Allow", "NotAction": ["iam:DeleteUser"], "Resource": "*"}
+        ]
+    }
+    assert admin_finding(document)[0] == "admin"
+
+
+def test_not_resource_is_not_assessed_never_pass():
+    document = {
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": "*",
+                "NotResource": "arn:aws:s3:::logs/one",
+            }
+        ]
+    }
+    kind, detail = admin_finding(document)
+    assert kind == "not_assessed"
+    assert kind != "clear"
+    assert "not_action_unsupported" in detail
+
+
+@pytest.mark.parametrize(
+    "action",
+    ["*:PUT*", "iam:*POLICY*", "IAM:Create*", "iam:Update*", "IAM:PassRole", "IAM:*"],
+)
+def test_iam_write_wildcards_and_mixed_case_are_not_pass(action):
+    kind, detail = admin_finding(_statement(action, "*"))
+    assert kind == "not_assessed"
+    assert kind != "clear"
+    assert "may_grant_admin" in detail
+
+
+@pytest.mark.parametrize(
+    "resource",
+    ["arn:aws-us-gov:*", "arn:aws-cn:*:*:*:*"],
+)
+def test_other_partition_all_resources_fail(resource):
+    assert admin_finding(_statement("*", resource))[0] == "admin"
+
+
+def test_condition_on_admin_statement_is_not_pass():
+    document = {
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": "*",
+                "Resource": "*",
+                "Condition": {"StringEquals": {"aws:RequestedRegion": "us-east-1"}},
+            }
+        ]
+    }
+    kind, detail = admin_finding(document)
+    assert kind == "not_assessed"
+    assert kind != "clear"
+    assert "condition_unsupported" in detail
+
+
+def test_deny_does_not_cancel_an_admin_allow():
+    document = {
+        "Statement": [
+            {"Effect": "Allow", "Action": "*", "Resource": "arn:aws-us-gov:*"},
+            {"Effect": "Deny", "Action": "*", "Resource": "*"},
+        ]
+    }
+    assert admin_finding(document)[0] == "admin"
