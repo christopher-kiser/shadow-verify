@@ -136,7 +136,7 @@ def test_fail_when_attached_policy_is_admin():
         aws, _evidence = aws_stack()
         result = CHECKER.check(claim("iam_role", "app-deploy", _expected(arn)), aws)
     assert result.verdict == Verdict.FAIL
-    assert any("Action * or *:* on Resource *" in reason for reason in result.reasons)
+    assert any("Action * or *:* on all resources" in reason for reason in result.reasons)
 
 
 def test_deny_star_is_not_admin():

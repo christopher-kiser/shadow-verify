@@ -9,9 +9,11 @@ A claim must set all three:
 * ``attached_policy_arns``: the exact set of attached managed policy ARNs.
   Inline policy names are not part of this set.
 * ``no_admin_star: true``: no unconditional Allow of ``*`` or ``*:*``,
-  and no NotAction, on a resource pattern that matches every ARN in a
-  partition. Action names are compared case-insensitively. IAM-write
-  wildcards on those resources are NOT ASSESSED (``may_grant_admin``).
+  and no NotAction, on all resources. A pattern is scoped only when its
+  partition and service are literal and the rest is not purely wildcards.
+  Action names are compared case-insensitively. Named IAM-write actions
+  on all resources are NOT ASSESSED (``may_grant_admin``). A PASS does
+  not rule out every privilege-escalation path.
   Any other NotAction or NotResource is NOT ASSESSED
   (``not_action_unsupported``). An otherwise-admin Allow that also has
   a Condition is NOT ASSESSED (``condition_unsupported``). A Deny does

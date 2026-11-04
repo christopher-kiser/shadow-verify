@@ -14,7 +14,7 @@ Local mocked run on Python 3.12.3 (Linux), 2026-11-04. Every AWS interaction in 
 
 ```
 python3 -m pytest -q
-162 passed, 1 skipped in 16.34s
+173 passed, 1 skipped in 14.91s
 ```
 
 MOCKED. The skip is `tests/test_live.py` because `SV_LIVE` is not set. Two mocked demo runs both exited 1 with `bundle_sha256` `39f3a4677a9830ced8d9b7ad7d325c0758e4783955832d46686381f62b5701b4`. `python -m pip_audit` in a clean virtualenv printed `No known vulnerabilities found`.
@@ -72,3 +72,4 @@ No AWS account was used. moto supplied the bucket.
 - 2026-11-04 — A range entry with no CIDR is `unresolvable_source` (NOT ASSESSED). Reverting that match made tcp/22 from `0.0.0.0/0` PASS when the only range was a description. MOCKED `python3 -m pytest -q`: 114 passed, 1 skipped in 13.11s. CI for `4e8caee` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — IAM wrong-PASS: a role ARN in another account or partition is `arn_mismatch` (NOT ASSESSED), and all-resource admin patterns fail while `iam:*` on all resources is `may_grant_admin`. Breaking each check made the new tests PASS again (pytest exit 1). MOCKED `python3 -m pytest -q`: 150 passed, 1 skipped in 16.58s. Windows is not claimed from this machine. Next: review the pull request.
 - 2026-11-04 — Admin-equivalent IAM holes: NotAction on all resources is FAIL; other NotAction or NotResource is `not_action_unsupported`; IAM-write wildcards are case-insensitive `may_grant_admin`; `arn:aws-us-gov:*` and `arn:aws-cn:*:*:*:*` are all resources; a Condition on an otherwise-admin Allow is `condition_unsupported`; a Deny does not cancel an Allow. Each break-it exited 1. MOCKED `python3 -m pytest -q`: 162 passed, 1 skipped in 16.34s. Next: wait for Ubuntu and Windows CI on the pull request.
+- 2026-11-04 — Sentinel on `81b7987`: action match is case-insensitive, the resource automaton is a short fail-closed rule (literal partition and service, rest not purely wildcards), and the named escalation actions are `may_grant_admin`. A `no_admin_star` PASS does not rule out every escalation path. Break-its exited 1. ADR 030 stays free: main has 026 and 027, PR 5 has 028, PR 6 has 029. MOCKED `python3 -m pytest -q`: 173 passed, 1 skipped in 14.91s. Next: wait for Ubuntu and Windows CI.

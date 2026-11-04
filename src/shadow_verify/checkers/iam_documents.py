@@ -24,9 +24,12 @@ _PRIVESC_ACTIONS = (
     "iam:AttachRolePolicy",
     "iam:AttachGroupPolicy",
     "iam:UpdateAssumeRolePolicy",
+    "iam:SetDefaultPolicyVersion",
+    "iam:CreateAccessKey",
+    "iam:CreateLoginProfile",
+    "iam:UpdateLoginProfile",
+    "iam:AddUserToGroup",
 )
-_PARTITIONS = ("aws", "aws-us-gov", "aws-cn")
-_SEARCH_LIMIT = 20000
 _NOT_ACTION = "not_action_unsupported: NotAction or NotResource is not evaluated in v0"
 _CONDITION = "condition_unsupported: Condition is not evaluated on an admin Allow"
 
@@ -101,7 +104,7 @@ def admin_finding(document: dict) -> tuple[str, str]:
             "not_assessed",
             "may_grant_admin: Allow action can grant admin on all resources",
         )
-    return "clear", "no Allow statement grants Action * or *:* on Resource *"
+    return "clear", "no Allow statement grants Action * or *:* on all resources"
 
 
 def _allow_statement(statement: dict) -> tuple[str, str]:
@@ -112,15 +115,12 @@ def _allow_statement(statement: dict) -> tuple[str, str]:
     resources = _as_strings(statement.get("Resource"))
     if actions is None or resources is None:
         return "not_assessed", "Action or Resource shape was not understood"
-    covers = _resources_cover_all(resources)
-    if covers is None:
-        return "not_assessed", "Resource pattern was not understood"
-    if not covers:
+    if not _resources_cover_all(resources):
         return "clear", ""
     if any(action.casefold() in _ADMIN_ACTIONS for action in actions):
         if conditioned:
             return "not_assessed", _CONDITION
-        return "admin", "Allow statement grants Action * or *:* on Resource *"
+        return "admin", "Allow statement grants Action * or *:* on all resources"
     if any(_may_grant_admin(action) for action in actions):
         if conditioned:
             return "not_assessed", _CONDITION
@@ -135,10 +135,7 @@ def _not_elements(statement: dict, conditioned: bool) -> tuple[str, str]:
     resources = _as_strings(statement.get("Resource"))
     if excluded is None or resources is None:
         return "not_assessed", _NOT_ACTION
-    covers = _resources_cover_all(resources)
-    if covers is None:
-        return "not_assessed", "Resource pattern was not understood"
-    if not covers:
+    if not _resources_cover_all(resources):
         return "not_assessed", _NOT_ACTION
     if conditioned:
         return "not_assessed", _CONDITION
@@ -163,17 +160,8 @@ def decode_policy_document(document: object) -> dict | None:
     return None
 
 
-def _resources_cover_all(resources: list[str]) -> bool | None:
-    unknown = False
-    for resource in resources:
-        covered = _matches_all_resources(resource)
-        if covered is True:
-            return True
-        if covered is None:
-            unknown = True
-    if unknown:
-        return None
-    return False
+def _resources_cover_all(resources: list[str]) -> bool:
+    return any(_matches_all_resources(resource) for resource in resources)
 
 
 def _may_grant_admin(action: str) -> bool:
@@ -190,101 +178,29 @@ def _glob_match(pattern: str, value: str) -> bool:
     return re.fullmatch(escaped, value) is not None
 
 
-def _matches_all_resources(pattern: str) -> bool | None:
-    """True when the pattern matches every ARN in at least one partition.
+def _matches_all_resources(pattern: str) -> bool:
+    """Fail closed. Scoped only for a literal partition and service.
 
-    ``*`` matches any character, including ``:`` and ``/``. ``None`` means
-    the pattern was too large to decide. That must not become a pass.
+    The remainder must contain a character other than ``*``, ``?``, or ``:``.
+    Anything else counts as all resources, including ``*`` and a wildcard
+    service or partition.
     """
 
-    if pattern and set(pattern) == {"*"}:
-        return True
-    if len(pattern) > 180:
-        return None
-    for partition in _partitions_for(pattern):
-        covered = _covers_partition(pattern, f"arn:{partition}:")
-        if covered is None:
-            return None
-        if covered:
-            return True
-    return False
-
-
-def _partitions_for(pattern: str) -> tuple[str, ...]:
     parts = pattern.split(":")
-    if len(parts) < 2 or parts[0] != "arn":
-        return _PARTITIONS
-    segment = parts[1]
-    if segment and "*" not in segment and "?" not in segment and segment not in _PARTITIONS:
-        return _PARTITIONS + (segment,)
-    return _PARTITIONS
-
-
-def _covers_partition(pattern: str, prefix: str) -> bool | None:
-    literals = {char for char in pattern if char not in "*?"}
-    alphabet = set(prefix) | literals | {":", "\x01"}
-    start = _epsilon(pattern, frozenset({0}))
-    seen = {(0, start)}
-    queue = [(0, start)]
-    steps = 0
-    accept = len(pattern)
-    resource_state = len(prefix) + 3
-    while queue:
-        state, positions = queue.pop()
-        steps += 1
-        if steps > _SEARCH_LIMIT:
-            return None
-        if state == resource_state and accept not in positions:
-            return False
-        for char in alphabet:
-            nxt = _arn_step(state, char, prefix)
-            if nxt is None:
-                continue
-            moved = _epsilon(pattern, _consume(pattern, positions, char))
-            key = (nxt, moved)
-            if key not in seen:
-                seen.add(key)
-                queue.append(key)
-    return True
-
-
-def _arn_step(state: int, char: str, prefix: str) -> int | None:
-    if state < len(prefix):
-        if char == prefix[state]:
-            return state + 1
-        return None
-    if state == len(prefix):
-        return len(prefix) + 1 if char == ":" else len(prefix)
-    if state == len(prefix) + 1:
-        return len(prefix) + 2 if char == ":" else len(prefix) + 1
-    if state == len(prefix) + 2:
-        return len(prefix) + 3 if char == ":" else len(prefix) + 2
-    return len(prefix) + 3
-
-
-def _epsilon(pattern: str, positions: frozenset[int]) -> frozenset[int]:
-    found = set(positions)
-    grew = True
-    while grew:
-        grew = False
-        for index in list(found):
-            if index < len(pattern) and pattern[index] == "*" and (index + 1) not in found:
-                found.add(index + 1)
-                grew = True
-    return frozenset(found)
-
-
-def _consume(pattern: str, positions: frozenset[int], char: str) -> frozenset[int]:
-    nxt: set[int] = set()
-    for index in positions:
-        if index >= len(pattern):
-            continue
-        token = pattern[index]
-        if token == "*":
-            nxt.add(index)
-        elif token == "?" or token == char:
-            nxt.add(index + 1)
-    return frozenset(nxt)
+    if len(parts) < 3 or parts[0] != "arn":
+        return True
+    partition, service = parts[1], parts[2]
+    if (
+        not partition
+        or not service
+        or "*" in partition
+        or "?" in partition
+        or "*" in service
+        or "?" in service
+    ):
+        return True
+    rest = ":".join(parts[3:])
+    return not any(char not in "*:?" for char in rest)
 
 
 def _as_strings(value: object) -> list[str] | None:

@@ -116,7 +116,7 @@ def test_star_action_on_partition_wildcard_resource_fails():
         aws, _evidence = aws_stack()
         result = CHECKER.check(claim("iam_role", "app-deploy", _expected()), aws)
     assert result.verdict == Verdict.FAIL
-    assert any("Action * or *:* on Resource *" in reason for reason in result.reasons)
+    assert any("Action * or *:* on all resources" in reason for reason in result.reasons)
 
 
 def test_iam_star_on_all_resources_is_not_pass():
@@ -126,16 +126,15 @@ def test_iam_star_on_all_resources_is_not_pass():
         aws, _evidence = aws_stack()
         result = CHECKER.check(claim("iam_role", "app-deploy", _expected()), aws)
     assert result.verdict == Verdict.NOT_ASSESSED
-    assert result.verdict != Verdict.PASS
     assert any("may_grant_admin" in reason for reason in result.reasons)
 
 
 @pytest.mark.parametrize(
     ("action", "resource", "kind", "token"),
     [
-        ("*", "arn:*:*:*:*:*", "admin", "Resource *"),
-        ("*:*", "arn:aws:*", "admin", "Resource *"),
-        ("*", "arn:aws:s3:::*", "clear", ""),
+        ("*", "arn:*:*:*:*:*", "admin", "all resources"),
+        ("*:*", "arn:aws:*", "admin", "all resources"),
+        ("*", "arn:aws:s3:::*", "admin", "all resources"),
         ("*", "arn:aws:s3:::logs/*", "clear", ""),
         ("*", "arn:aws:iam::*:role/*", "clear", ""),
         ("iam:*", "*", "not_assessed", "may_grant_admin"),
@@ -148,7 +147,7 @@ def test_iam_star_on_all_resources_is_not_pass():
         ("iam:*", "arn:aws:*:*:*:*", "not_assessed", "may_grant_admin"),
         ("s3:*", "*", "clear", ""),
         ("iam:GetUser", "*", "clear", ""),
-        ("*", ["arn:aws:s3:::logs/*", "*"], "admin", "Resource *"),
+        ("*", ["arn:aws:s3:::logs/*", "*"], "admin", "all resources"),
     ],
 )
 def test_admin_finding_resource_and_privesc(action, resource, kind, token):
@@ -200,7 +199,22 @@ def test_not_resource_is_not_assessed_never_pass():
 
 @pytest.mark.parametrize(
     "action",
-    ["*:PUT*", "iam:*POLICY*", "IAM:Create*", "iam:Update*", "IAM:PassRole", "IAM:*"],
+    [
+        "*:PUT*",
+        "iam:*POLICY*",
+        "IAM:Create*",
+        "iam:Update*",
+        "IAM:PassRole",
+        "iam:passrole",
+        "IAM:*",
+        "Iam:*",
+        "iam:SetDefaultPolicyVersion",
+        "iam:CreateAccessKey",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:CreateLoginProfile",
+        "iam:UpdateLoginProfile",
+        "iam:AddUserToGroup",
+    ],
 )
 def test_iam_write_wildcards_and_mixed_case_are_not_pass(action):
     kind, detail = admin_finding(_statement(action, "*"))
@@ -211,10 +225,20 @@ def test_iam_write_wildcards_and_mixed_case_are_not_pass(action):
 
 @pytest.mark.parametrize(
     "resource",
-    ["arn:aws-us-gov:*", "arn:aws-cn:*:*:*:*"],
+    [
+        "arn:aws:?*:*:*:*",
+        "arn:aws:*:*:*:?*",
+        "arn:aws-us-gov:*",
+        "arn:aws-cn:*:*:*:*",
+    ],
 )
-def test_other_partition_all_resources_fail(resource):
+def test_fail_closed_resource_patterns_are_admin(resource):
     assert admin_finding(_statement("*", resource))[0] == "admin"
+
+
+def test_long_literal_arn_is_clear():
+    resource = "arn:aws:s3:::" + ("a" * 200)
+    assert admin_finding(_statement("*", resource))[0] == "clear"
 
 
 def test_condition_on_admin_statement_is_not_pass():
