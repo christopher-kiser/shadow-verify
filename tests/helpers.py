@@ -41,6 +41,46 @@ def claim(
     )
 
 
+# Spec section 2. Shared by the core eval tests and the legacy scenario tests.
+CONDITIONS = {
+    "none",
+    "wrong_region",
+    "wrong_account",
+    "stale_read",
+    "access_denied",
+    "throttling",
+    "timeout",
+    "not_found",
+    "pagination",
+    "truncated_pagination",
+    "underspecified_claim",
+    "cidr_semantics",
+    "unresolvable_source",
+}
+
+SEED_ALLOWLIST = {
+    "s3.create_bucket",
+    "s3.put_public_access_block",
+    "s3.put_bucket_encryption",
+    "s3.put_bucket_versioning",
+    "s3.put_bucket_policy",
+    "s3.delete_bucket_policy",
+    "kms.create_key",
+    "ec2.create_vpc",
+    "ec2.create_security_group",
+    "ec2.authorize_security_group_ingress",
+    "ec2.revoke_security_group_ingress",
+    "iam.create_role",
+    "iam.update_assume_role_policy",
+    "iam.create_policy",
+    "iam.create_policy_version",
+    "iam.attach_role_policy",
+    "iam.detach_role_policy",
+    "ec2.create_managed_prefix_list",
+    "dynamodb.create_table",
+    "sts.assume_role",
+}
+
 S3_LOCKED = {
     "block_public_acls": True,
     "ignore_public_acls": True,

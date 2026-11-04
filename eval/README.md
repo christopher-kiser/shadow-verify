@@ -27,3 +27,7 @@ python -m eval.manifest --check
 A mismatch exits 2 and names the file whose bytes no longer match. The held-out pin is checked there too, and a wrong `set_sha256` fails the check.
 
 Scenarios are author-designed, not real agent traces. Labeled OFFLINE.
+
+## Legacy set
+
+`legacy/` holds six previously seen cases, `LG-01` through `LG-06`, translated from the raven-shadow-core qualification fixtures for Juniper, Selwick, and Ternfield. They are scored and reported in their own table. They are never part of the core set or the held-out set. `python -m eval.manifest --check` does not read them. Order for this set: label, then adjudicate, then write the manifest. The legacy manifest is not in this change. See `legacy/README.md`.
