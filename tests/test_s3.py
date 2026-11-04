@@ -11,6 +11,10 @@ from tests.helpers import REGION, S3_LOCKED, aws_stack, claim
 CHECKER = S3BucketChecker()
 
 
+def _stub_location(stubber, bucket: str) -> None:
+    stubber.add_response("get_bucket_location", {}, {"Bucket": bucket})
+
+
 def _bucket(name: str, *, block_public_policy: bool = True) -> None:
     s3 = boto3.client("s3", region_name=REGION)
     s3.create_bucket(Bucket=name)
@@ -57,6 +61,7 @@ def test_fail_when_one_public_access_flag_is_false():
 def test_fail_when_bucket_policy_status_is_public():
     s3 = boto3.client("s3", region_name=REGION)
     stubber = Stubber(s3)
+    _stub_location(stubber, "logs")
     stubber.add_response(
         "get_public_access_block",
         {
@@ -100,6 +105,12 @@ def test_not_assessed_when_access_is_denied():
     s3 = boto3.client("s3", region_name=REGION)
     stubber = Stubber(s3)
     stubber.add_client_error(
+        "get_bucket_location",
+        service_error_code="AccessDenied",
+        service_message="denied",
+        expected_params={"Bucket": "logs"},
+    )
+    stubber.add_client_error(
         "get_public_access_block",
         service_error_code="AccessDenied",
         service_message="denied",
@@ -124,6 +135,7 @@ def test_not_assessed_when_access_is_denied():
 def test_fail_wins_when_a_flag_contradicts_and_policy_status_is_denied():
     s3 = boto3.client("s3", region_name=REGION)
     stubber = Stubber(s3)
+    _stub_location(stubber, "logs")
     stubber.add_response(
         "get_public_access_block",
         {
@@ -162,6 +174,7 @@ def test_not_assessed_when_bucket_does_not_exist():
 def test_throttling_is_not_assessed():
     s3 = boto3.client("s3", region_name=REGION)
     stubber = Stubber(s3)
+    _stub_location(stubber, "logs")
     stubber.add_client_error(
         "get_public_access_block",
         service_error_code="Throttling",
@@ -180,6 +193,7 @@ def test_throttling_is_not_assessed():
 def test_timeout_is_not_assessed():
     s3 = boto3.client("s3", region_name=REGION)
     stubber = Stubber(s3)
+    _stub_location(stubber, "logs")
     stubber.add_client_error(
         "get_public_access_block",
         service_error_code="RequestTimeout",
@@ -200,6 +214,9 @@ def test_missing_credentials_are_not_assessed():
     from botocore.exceptions import NoCredentialsError
 
     class NoCreds:
+        def get_bucket_location(self, **kwargs):
+            raise NoCredentialsError()
+
         def get_public_access_block(self, **kwargs):
             raise NoCredentialsError()
 

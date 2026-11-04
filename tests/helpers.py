@@ -16,6 +16,7 @@ def aws_stack(evidence: EvidenceLog | None = None) -> tuple[BotoAws, EvidenceLog
         ec2=boto3.client("ec2", region_name=REGION),
         iam=boto3.client("iam", region_name=REGION),
         evidence=evidence,
+        region=REGION,
     )
     return aws, evidence
 
@@ -29,6 +30,7 @@ def claim(
     statement: str = "stated by the agent",
     agent_note: str | None = None,
     terraform_address: str | None = None,
+    region: str | None = None,
 ) -> Claim:
     return Claim(
         id=claim_id,
@@ -38,6 +40,7 @@ def claim(
         expected=expected,
         agent_note=agent_note,
         terraform_address=terraform_address,
+        region=region,
     )
 
 

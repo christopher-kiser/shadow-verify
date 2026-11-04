@@ -63,6 +63,17 @@ def test_write_call_is_refused_before_any_client_call():
         aws._invoke("s3", "PutBucketPolicy", BoomClient(), Bucket="logs-prod", Policy="{}")
 
 
+def test_bucket_location_is_allowed_and_secret_reads_stay_refused():
+    assert refusal("s3", "GetBucketLocation") is None
+    assert "s3:GetBucketLocation" in ALLOWED_OPERATIONS
+    assert refusal("s3", "GetObject") == "refusing denied AWS call s3:GetObject"
+    assert refusal("secretsmanager", "GetSecretValue") == (
+        "refusing denied AWS call secretsmanager:GetSecretValue"
+    )
+    assert "s3:GetObject" in DENIED_OPERATIONS
+    assert "secretsmanager:GetSecretValue" in DENIED_OPERATIONS
+
+
 def test_denied_pair_wins_over_an_allowlist_prefix():
     assert refusal("secretsmanager", "GetSecretValue") == "refusing denied AWS call secretsmanager:GetSecretValue"
     assert refusal("s3", "GetObject") == "refusing denied AWS call s3:GetObject"
@@ -103,6 +114,7 @@ def test_iam_policy_actions_equal_the_allowlist():
     assert ec2["Action"] == ["ec2:DescribeSecurityGroups"]
     assert ec2["Resource"] == "*"
     assert by_sid["S3BucketReads"]["Action"] == [
+        "s3:GetBucketLocation",
         "s3:GetBucketPolicyStatus",
         "s3:GetBucketPublicAccessBlock",
     ]

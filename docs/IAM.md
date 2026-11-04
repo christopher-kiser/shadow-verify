@@ -2,7 +2,7 @@
 
 The policy file is [iam-policy.json](iam-policy.json). A test checks that its Allow actions are exactly `ALLOWED_OPERATIONS` and its Deny actions are exactly `DENIED_OPERATIONS` in `src/shadow_verify/aws.py`.
 
-Allow actions are the IAM actions for the API operations the client calls. The map is `OPERATION_IAM_ACTIONS` in `src/shadow_verify/aws.py`. `GetPublicAccessBlock` requires `s3:GetBucketPublicAccessBlock`, not `s3:GetPublicAccessBlock`. There is no `s3:Get*`, no `iam:Get*`, and no AWS managed `ReadOnlyAccess` policy. v0 does not call `s3:GetBucketPolicy`. Publicity comes from `GetBucketPolicyStatus`.
+Allow actions are the IAM actions for the API operations the client calls. The map is `OPERATION_IAM_ACTIONS` in `src/shadow_verify/aws.py`. `GetPublicAccessBlock` requires `s3:GetBucketPublicAccessBlock`, not `s3:GetPublicAccessBlock`. `GetBucketLocation` uses `s3:GetBucketLocation`. There is no `s3:Get*`, no `iam:Get*`, and no AWS managed `ReadOnlyAccess` policy. v0 does not call `s3:GetBucketPolicy`. Publicity comes from `GetBucketPolicyStatus`. The bucket region comes from `GetBucketLocation`.
 
 Each client uses botocore standard retries, `max_attempts` 3, a 3 second connect timeout, and a 10 second read timeout. The worst case for one call is about 52 seconds: three attempts at 13 seconds each, plus at most 13 seconds of backoff and retry-after across the two gaps.
 

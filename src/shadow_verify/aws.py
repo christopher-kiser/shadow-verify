@@ -19,6 +19,7 @@ from shadow_verify.evidence import EvidenceItem, EvidenceLog
 # API operations this process calls. Not a verb prefix.
 ALLOWED_OPERATIONS: frozenset[str] = frozenset(
     {
+        "s3:GetBucketLocation",
         "s3:GetPublicAccessBlock",
         "s3:GetBucketPolicyStatus",
         "ec2:DescribeSecurityGroups",
@@ -35,6 +36,7 @@ ALLOWED_OPERATIONS: frozenset[str] = frozenset(
 # the API name is not the IAM action (GetPublicAccessBlock is
 # s3:GetBucketPublicAccessBlock; ListObjectsV2 and HeadBucket are s3:ListBucket).
 OPERATION_IAM_ACTIONS: dict[str, str] = {
+    "s3:GetBucketLocation": "s3:GetBucketLocation",
     "s3:GetPublicAccessBlock": "s3:GetBucketPublicAccessBlock",
     "s3:GetBucketPolicyStatus": "s3:GetBucketPolicyStatus",
     "ec2:DescribeSecurityGroups": "ec2:DescribeSecurityGroups",
@@ -127,11 +129,12 @@ class ApiResult:
 
 
 class BotoAws:
-    def __init__(self, *, s3, ec2, iam, evidence: EvidenceLog) -> None:
+    def __init__(self, *, s3, ec2, iam, evidence: EvidenceLog, region: str = "us-east-1") -> None:
         self._s3 = s3
         self._ec2 = ec2
         self._iam = iam
         self.evidence = evidence
+        self.region = region
 
     @classmethod
     def from_session(cls, session, region: str, evidence: EvidenceLog) -> BotoAws:
@@ -146,7 +149,11 @@ class BotoAws:
             ec2=session.client("ec2", region_name=region, config=CLIENT_CONFIG),
             iam=session.client("iam", region_name=region, config=CLIENT_CONFIG),
             evidence=evidence,
+            region=region,
         )
+
+    def get_bucket_location(self, bucket: str) -> EvidenceItem:
+        return self._invoke("s3", "GetBucketLocation", self._s3, Bucket=bucket)
 
     def get_public_access_block(self, bucket: str) -> EvidenceItem:
         return self._invoke("s3", "GetPublicAccessBlock", self._s3, Bucket=bucket)

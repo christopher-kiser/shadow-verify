@@ -20,6 +20,8 @@ def test_example_claims_file_parses():
     assert claims[2].expected["no_admin_star"] is True
     assert claims[0].agent_note
     assert claims[0].terraform_address == "aws_s3_bucket.logs"
+    assert claims[0].region == "us-east-1"
+    assert claims[1].region is None
 
 
 def test_json_claims_round_trip():
@@ -61,6 +63,36 @@ def test_unknown_resource_type_is_not_assessed():
     result = run_checks(claims, aws=None)[0]
     assert result.verdict == Verdict.NOT_ASSESSED
     assert "unsupported resource_type" in result.reasons[0]
+
+
+def test_optional_region_is_loaded():
+    text = """
+    version: 1
+    claims:
+      - id: logs
+        resource_type: s3_bucket
+        identifier: logs-prod
+        region: eu-west-1
+        expected:
+          block_public_acls: true
+    """
+    claims = load_claims(text, ".yaml")
+    assert claims[0].region == "eu-west-1"
+
+
+def test_blank_region_is_rejected():
+    text = """
+    version: 1
+    claims:
+      - id: logs
+        resource_type: s3_bucket
+        identifier: logs-prod
+        region: " "
+        expected:
+          block_public_acls: true
+    """
+    with pytest.raises(ClaimsError, match="non-empty"):
+        load_claims(text, ".yaml")
 
 
 def test_yaml_rejects_tabs_and_anchors():

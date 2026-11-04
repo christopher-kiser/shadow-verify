@@ -2,22 +2,24 @@
 
 ## Current state
 
-v0 is implemented on `cursor/shadow-verify-v0-a059`. The CLI reads a claims file, calls read-only AWS APIs for S3 public access, EC2 security group ingress, and IAM role trust / attached policies / star-admin, and writes a hashed evidence bundle. Verdicts are PASS, FAIL, or NOT ASSESSED. Rules only.
+v0 reads S3 public access, EC2 security group ingress, and IAM role trust / policies, and writes a hashed evidence bundle. Verdicts are PASS, FAIL, or NOT ASSESSED. Rules only. An `s3_bucket` check always reads `GetBucketLocation`. The claim `region`, or `--region` when the claim omits it, must match. `null` and `""` are `us-east-1`. `EU` is `eu-west-1`. A mismatch is FAIL (`region_mismatch`). A location read error is NOT ASSESSED.
 
 ## Next step
 
-Review the pull request. The highest-value follow-up is whichever open question below should be locked before adding checkers.
+Review the region pull request. The eval adapter that passes a scenario region through waits on PR #5, which adds `eval/adapter.py`. That adapter is not on main.
 
 ## Demonstrated
 
-Local mocked run on Python 3.12.3 (Linux), 2026-11-03. Every AWS interaction in the suite is moto, botocore Stubber, or an in-process fake session. Nothing here called a real account.
+Local mocked run on Python 3.12.3 (Linux), 2026-11-04. Every AWS interaction in the suite is moto 5.2.5, botocore Stubber, or an in-process fake session. Nothing here called a real account.
 
 ```
 python3 -m pytest -q
-114 passed, 1 skipped in 13.11s
+139 passed, 1 skipped in 12.13s
 ```
 
-MOCKED. The skip is `tests/test_live.py` because `SV_LIVE` is not set. Two mocked demo runs both exited 1 with `bundle_sha256` `39f3a4677a9830ced8d9b7ad7d325c0758e4783955832d46686381f62b5701b4`. `python -m pip_audit` in a clean virtualenv printed `No known vulnerabilities found`.
+Exit code 0. A us-west-2 bucket checked from us-east-1 is FAIL (`region_mismatch`). Removing that comparison made `test_us_west_2_bucket_against_us_east_1_is_fail` return PASS; pytest exit code 1. Restoring it passed; pytest exit code 0. Core `set_sha256` is still `7b4cd4f1e447f0cee054c32aeaa5eafef3a670bd2e671b38f9316f69aa4af113`.
+
+MOCKED. The skip is `tests/test_live.py` because `SV_LIVE` is not set. Two mocked demo runs both exited 1 with `bundle_sha256` `b77dee1b3ff5e66bd9760f31439563ee20f585b4a60c3a73e094ae431805bf0f`.
 
 CI for `4e8caee` is green on `ubuntu-latest` and `windows-latest`:
 
@@ -28,6 +30,7 @@ CI for `4e8caee` is green on `ubuntu-latest` and `windows-latest`:
 
 ```
 FAIL  logs-bucket  S3 bucket locked down
+  - region is us-east-1
   - block_public_policy is false; expected true
   agent_note (untrusted, ignored): Done. Public access is fully blocked and the bucket policy is not public.
 ```
@@ -36,7 +39,7 @@ No AWS account was used. moto supplied the bucket.
 
 ## CI
 
-`4e8caee` is green on `ubuntu-latest` and `windows-latest`.
+The region change has not run in CI yet. The last green matrix for an earlier commit, `4e8caee`, was `ubuntu-latest` and `windows-latest`.
 
 - `4e8caee` push: https://github.com/christopher-kiser/shadow-verify/actions/runs/41836017217
 - `4e8caee` pull request: https://github.com/christopher-kiser/shadow-verify/actions/runs/41836026609
@@ -44,6 +47,7 @@ No AWS account was used. moto supplied the bucket.
 ## Not established
 
 - A real AWS account. Every PASS / FAIL / NOT ASSESSED result in the local suite is MOCKED.
+- Windows for the region check. This session ran on Linux. CI runs `windows-latest`.
 - Terraform value comparison. `--plan` only reports whether an address is in `resource_changes`.
 - CloudTrail.
 - A signature on the evidence bundle. `shadow-verify verify` checks internal hashes only.
@@ -70,3 +74,4 @@ No AWS account was used. moto supplied the bucket.
 - 2026-11-04 — ICMP matches on type and ignores the code. Protocol number `1` is icmp. Raw `IpProtocol` `6`, `17`, and `1` go through a botocore Stubber. Emptying the number map made those three cases PASS instead of FAIL; the map was restored. MOCKED `python3 -m pytest -q`: 108 passed, 1 skipped in 11.05s. CI for `bb2da38` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — A forbid of `all` / `-1` covers every protocol, then ports or ICMP type. Reverting that match made the tcp/22 and icmp type 8 world cases PASS instead of FAIL. CGNAT `100.64.0.0/10` still passes a world forbid. The job summary escapes claim text. MOCKED `python3 -m pytest -q`: 113 passed, 1 skipped in 11.88s. CI for `50d5a72` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — A range entry with no CIDR is `unresolvable_source` (NOT ASSESSED). Reverting that match made tcp/22 from `0.0.0.0/0` PASS when the only range was a description. MOCKED `python3 -m pytest -q`: 114 passed, 1 skipped in 13.11s. CI for `4e8caee` is green on ubuntu-latest and windows-latest. Next: review PR 1.
+- 2026-11-04 — S3 checks read `GetBucketLocation`. A us-west-2 bucket no longer PASSes a us-east-1 run. `null` and `""` are `us-east-1`; `EU` is `eu-west-1`. AccessDenied on the location is NOT ASSESSED. MOCKED `python3 -m pytest -q`: 139 passed, 1 skipped in 12.13s, exit 0. Break-it of the region comparison: pytest exit 1, then exit 0 after restore. Core `set_sha256` unchanged. Windows for this change is not run here. Next: review the region pull request.
