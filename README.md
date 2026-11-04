@@ -92,6 +92,20 @@ A security-group source that is a prefix list or another security group is `unre
 
 S3 checks are the four public-access-block flags and `GetBucketPolicyStatus.IsPublic`. They do not read object ACLs, the bucket ACL, or the account-level public access block. The IAM action for `GetPublicAccessBlock` is `s3:GetBucketPublicAccessBlock`.
 
+## Evaluation
+
+Author-designed scenarios, not real agent traces. The scored run is MOCKED (moto). It does not call AWS and it does not use network credentials.
+
+```bash
+python -m pip install -e ".[dev,eval]"
+python -m eval.run --all --include-stretch --check-determinism
+python -m eval.report
+```
+
+Raw Shadow Verify numbers come first. A second table is labeled "SV + eval fidelity gate (not the product)". v0 only reads S3 Block Public Access, whether a bucket policy is public, security-group `not_contains` forbids, and an IAM role when trust, attached policies, and `no_admin_star` are all present. Every other property or resource is NOT ASSESSED. Those coverage abstentions are listed apart from abstentions v0 earned by reading AWS. A property that was not read cannot PASS. The committed counts are in `eval/results/mocked/report.md`.
+
+The held-out cases are not in this repo. `--heldout` checks the pin and does not run them.
+
 ## Development
 
 ```bash

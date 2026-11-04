@@ -2,11 +2,11 @@
 
 ## Current state
 
-v0 is implemented on `cursor/shadow-verify-v0-a059`. The CLI reads a claims file, calls read-only AWS APIs for S3 public access, EC2 security group ingress, and IAM role trust / attached policies / star-admin, and writes a hashed evidence bundle. Verdicts are PASS, FAIL, or NOT ASSESSED. Rules only.
+v0 is on main. The eval set is frozen at `eval-freeze-v1` (`df422f3`). The MOCKED harness scores that set through the v0 checkers and does not retune them. Properties v0 cannot read are NOT ASSESSED.
 
 ## Next step
 
-Review the pull request. The highest-value follow-up is whichever open question below should be locked before adding checkers.
+Commit the first scored run and read its coverage-gap list. Do not edit the frozen labels to match v0.
 
 ## Demonstrated
 
@@ -70,3 +70,4 @@ No AWS account was used. moto supplied the bucket.
 - 2026-11-04 — ICMP matches on type and ignores the code. Protocol number `1` is icmp. Raw `IpProtocol` `6`, `17`, and `1` go through a botocore Stubber. Emptying the number map made those three cases PASS instead of FAIL; the map was restored. MOCKED `python3 -m pytest -q`: 108 passed, 1 skipped in 11.05s. CI for `bb2da38` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — A forbid of `all` / `-1` covers every protocol, then ports or ICMP type. Reverting that match made the tcp/22 and icmp type 8 world cases PASS instead of FAIL. CGNAT `100.64.0.0/10` still passes a world forbid. The job summary escapes claim text. MOCKED `python3 -m pytest -q`: 113 passed, 1 skipped in 11.88s. CI for `50d5a72` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — A range entry with no CIDR is `unresolvable_source` (NOT ASSESSED). Reverting that match made tcp/22 from `0.0.0.0/0` PASS when the only range was a description. MOCKED `python3 -m pytest -q`: 114 passed, 1 skipped in 13.11s. CI for `4e8caee` is green on ubuntu-latest and windows-latest. Next: review PR 1.
+- 2026-11-04 — Eval harness for the frozen set. Unsupported properties are NOT ASSESSED and are not given a PASS. MOCKED `python3 -m pytest -q`: 176 passed, 1 skipped in 18.25s. The scored run is the next commit. Windows CI for this commit is not in yet.

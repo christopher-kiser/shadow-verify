@@ -1,8 +1,8 @@
 # Evaluation set
 
-Mode: OFFLINE. These files are declarative data. Nothing here calls AWS or the network, and nothing here is a scored run.
+Mode: MOCKED. The frozen files are still declarative. Scoring runs in moto and does not call AWS.
 
-This change freezes the evaluation set only. The runner, the seeder, and the scoring code are not in this change. They come later, after the v0 pull request merges, so the first scored run happens after the freeze.
+`python -m eval.run --all --include-stretch` then `python -m eval.report`. `--heldout` checks the pin and does not run the case files. The first scored run is `eval/results/mocked/`.
 
 Freeze order: label, adjudicate, freeze, then first run.
 

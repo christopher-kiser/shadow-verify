@@ -15,6 +15,8 @@ dependencies = ["boto3>=1.34", "rfc8785==0.1.4"]
 
 [project.optional-dependencies]
 dev = ["pytest==9.2.0", "moto==5.2.5", "pip-audit==2.10.1"]
+# Offline eval only. Versions match requirements-ci.txt.
+eval = ["boto3==1.43.123", "botocore==1.43.123", "moto==5.2.5", "rfc8785==0.1.4"]
 
 [project.scripts]
 shadow-verify = "shadow_verify.cli:main"
