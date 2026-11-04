@@ -19,10 +19,10 @@ python3 -m pytest -q
 
 MOCKED. The skip is `tests/test_live.py` because `SV_LIVE` is not set. Two mocked demo runs both exited 1 with `bundle_sha256` `39f3a4677a9830ced8d9b7ad7d325c0758e4783955832d46686381f62b5701b4`. `python -m pip_audit` in a clean virtualenv printed `No known vulnerabilities found`.
 
-CI for `784eb4f` is green on `ubuntu-latest` and `windows-latest`:
+CI for `bb2da38` is green on `ubuntu-latest` and `windows-latest`:
 
-- https://github.com/christopher-kiser/shadow-verify/actions/runs/41594099486 (push)
-- https://github.com/christopher-kiser/shadow-verify/actions/runs/41594105984 (pull request)
+- https://github.com/christopher-kiser/shadow-verify/actions/runs/41829270885 (push)
+- https://github.com/christopher-kiser/shadow-verify/actions/runs/41829279678 (pull request)
 
 `python3 examples/demo/run_demo.py` is mocked. It exited 1. Stdout included:
 
@@ -36,12 +36,10 @@ No AWS account was used. moto supplied the bucket.
 
 ## CI
 
-`784eb4f` and `6db1641` are green on `ubuntu-latest` and `windows-latest`.
+`bb2da38` is green on `ubuntu-latest` and `windows-latest`. Both jobs ran Test and Audit dependencies.
 
-- `784eb4f` push: https://github.com/christopher-kiser/shadow-verify/actions/runs/41594099486
-- `784eb4f` pull request: https://github.com/christopher-kiser/shadow-verify/actions/runs/41594105984
-- `6db1641` push: https://github.com/christopher-kiser/shadow-verify/actions/runs/41596335023
-- `6db1641` pull request: https://github.com/christopher-kiser/shadow-verify/actions/runs/41596340401
+- `bb2da38` push: https://github.com/christopher-kiser/shadow-verify/actions/runs/41829270885
+- `bb2da38` pull request: https://github.com/christopher-kiser/shadow-verify/actions/runs/41829279678
 
 ## Not established
 
@@ -69,4 +67,4 @@ No AWS account was used. moto supplied the bucket.
 - 2026-11-03 — Second review batch: pinned action SHAs, post-deploy example workflow, scoped IAM statements, OIDC trust pins, pip-audit and pytest strict settings, ubuntu/windows CI matrix. Windows: NOT ASSESSED. Mocked `python3 -m pytest -v`: 65 passed in 9.17s. Next: review PR 1.
 - 2026-11-03 — Forge correctness fixes: CIDR coverage, IAM action map, account-id index, RFC 8785 hashes, exit codes 0/1/2/3, socket block, client Config, mode and tool_commit. MOCKED `python3 -m pytest -v`: 90 passed, 1 skipped in 10.18s. CI for 784eb4f later went green on ubuntu-latest and windows-latest.
 - 2026-11-03 — Internet overlap instead of full cover, both address families for a world forbid, protocol numbers, unresolvable prefix lists and security-group sources, reports built from relabelled results. MOCKED `python3 -m pytest -q`: 103 passed, 1 skipped in 12.28s. Demo hash stable across two runs. CI for 6db1641 is green on ubuntu-latest and windows-latest. Next: review PR 1.
-- 2026-11-04 — ICMP matches on type and ignores the code. Protocol number `1` is icmp. Raw `IpProtocol` `6`, `17`, and `1` go through a botocore Stubber. Emptying the number map made those three cases PASS instead of FAIL; the map was restored. MOCKED `python3 -m pytest -q`: 108 passed, 1 skipped in 11.05s. Next: review PR 1.
+- 2026-11-04 — ICMP matches on type and ignores the code. Protocol number `1` is icmp. Raw `IpProtocol` `6`, `17`, and `1` go through a botocore Stubber. Emptying the number map made those three cases PASS instead of FAIL; the map was restored. MOCKED `python3 -m pytest -q`: 108 passed, 1 skipped in 11.05s. CI for `bb2da38` is green on ubuntu-latest and windows-latest. Next: review PR 1.
