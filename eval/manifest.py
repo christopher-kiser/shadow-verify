@@ -19,7 +19,7 @@ HELD_OUT_PIN = "69fda69f4d2716d9f5ece79724f13d415bee268fd40990db0b3d4ca147a3bb37
 HELD_OUT_ID = re.compile(r"^HB-\d{2}$")
 _DRIVE = re.compile(r"^[A-Za-z]:")
 
-# Spec section 6. Christopher commits the freeze record.
+# Spec section 6. With Christopher's approval, the agent commits the freeze record.
 MANIFEST_VERSION = 1
 MANIFEST_CREATED = "2026-11-03"
 MANIFEST_AUTHOR = "Christopher"
