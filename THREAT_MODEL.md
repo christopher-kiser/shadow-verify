@@ -38,4 +38,4 @@ The bundle is hashed with SHA-256 over RFC 8785 bytes after redaction and after 
 
 ## Out of scope for v0
 
-CloudTrail, a signature, and new checkers are not in this version. CI for `50d5a72` passed on `ubuntu-latest` and `windows-latest`.
+CloudTrail, a signature, and new checkers are not in this version. CI for `4e8caee` passed on `ubuntu-latest` and `windows-latest`.

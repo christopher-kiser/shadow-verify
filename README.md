@@ -30,7 +30,7 @@ shadow-verify run --claims .shadow/claims.yaml --region us-east-1 --json
 
 `python -m shadow_verify` is the same console entry point.
 
-These commands were run on Linux. CI for `50d5a72` also passed on `windows-latest`; the links are under GitHub Action.
+These commands were run on Linux. CI for `4e8caee` also passed on `windows-latest`; the links are under GitHub Action.
 
 ## Exit codes
 
@@ -71,10 +71,10 @@ The check reads the account after a change is deployed. [examples/github-workflo
 
 `action.yml` is a composite action. It installs this package with `requirements-ci.txt` as a constraint, optionally assumes a read-only role with GitHub OIDC, runs the CLI, writes the job summary, and uploads the evidence bundle. Third-party actions are pinned to commit SHAs. The sample workflow does not use `@main`. This repository has no release commit for the action itself, so the example uses a placeholder SHA and says to replace it.
 
-CI for commit `50d5a72` is green on `ubuntu-latest` and `windows-latest`:
+CI for commit `4e8caee` is green on `ubuntu-latest` and `windows-latest`:
 
-- push: https://github.com/christopher-kiser/shadow-verify/actions/runs/41830360841
-- pull request: https://github.com/christopher-kiser/shadow-verify/actions/runs/41830369070
+- push: https://github.com/christopher-kiser/shadow-verify/actions/runs/41836017217
+- pull request: https://github.com/christopher-kiser/shadow-verify/actions/runs/41836026609
 
 ## Security model
 

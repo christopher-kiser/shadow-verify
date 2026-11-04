@@ -19,10 +19,10 @@ python3 -m pytest -q
 
 MOCKED. The skip is `tests/test_live.py` because `SV_LIVE` is not set. Two mocked demo runs both exited 1 with `bundle_sha256` `39f3a4677a9830ced8d9b7ad7d325c0758e4783955832d46686381f62b5701b4`. `python -m pip_audit` in a clean virtualenv printed `No known vulnerabilities found`.
 
-CI for `50d5a72` is green on `ubuntu-latest` and `windows-latest`:
+CI for `4e8caee` is green on `ubuntu-latest` and `windows-latest`:
 
-- https://github.com/christopher-kiser/shadow-verify/actions/runs/41830360841 (push)
-- https://github.com/christopher-kiser/shadow-verify/actions/runs/41830369070 (pull request)
+- https://github.com/christopher-kiser/shadow-verify/actions/runs/41836017217 (push)
+- https://github.com/christopher-kiser/shadow-verify/actions/runs/41836026609 (pull request)
 
 `python3 examples/demo/run_demo.py` is mocked. It exited 1. Stdout included:
 
@@ -36,10 +36,10 @@ No AWS account was used. moto supplied the bucket.
 
 ## CI
 
-`50d5a72` is green on `ubuntu-latest` and `windows-latest`.
+`4e8caee` is green on `ubuntu-latest` and `windows-latest`.
 
-- `50d5a72` push: https://github.com/christopher-kiser/shadow-verify/actions/runs/41830360841
-- `50d5a72` pull request: https://github.com/christopher-kiser/shadow-verify/actions/runs/41830369070
+- `4e8caee` push: https://github.com/christopher-kiser/shadow-verify/actions/runs/41836017217
+- `4e8caee` pull request: https://github.com/christopher-kiser/shadow-verify/actions/runs/41836026609
 
 ## Not established
 
@@ -69,4 +69,4 @@ No AWS account was used. moto supplied the bucket.
 - 2026-11-03 — Internet overlap instead of full cover, both address families for a world forbid, protocol numbers, unresolvable prefix lists and security-group sources, reports built from relabelled results. MOCKED `python3 -m pytest -q`: 103 passed, 1 skipped in 12.28s. Demo hash stable across two runs. CI for 6db1641 is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — ICMP matches on type and ignores the code. Protocol number `1` is icmp. Raw `IpProtocol` `6`, `17`, and `1` go through a botocore Stubber. Emptying the number map made those three cases PASS instead of FAIL; the map was restored. MOCKED `python3 -m pytest -q`: 108 passed, 1 skipped in 11.05s. CI for `bb2da38` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — A forbid of `all` / `-1` covers every protocol, then ports or ICMP type. Reverting that match made the tcp/22 and icmp type 8 world cases PASS instead of FAIL. CGNAT `100.64.0.0/10` still passes a world forbid. The job summary escapes claim text. MOCKED `python3 -m pytest -q`: 113 passed, 1 skipped in 11.88s. CI for `50d5a72` is green on ubuntu-latest and windows-latest. Next: review PR 1.
-- 2026-11-04 — A range entry with no CIDR is `unresolvable_source` (NOT ASSESSED). Reverting that match made tcp/22 from `0.0.0.0/0` PASS when the only range was a description. MOCKED `python3 -m pytest -q`: 114 passed, 1 skipped in 13.11s. Next: review PR 1.
+- 2026-11-04 — A range entry with no CIDR is `unresolvable_source` (NOT ASSESSED). Reverting that match made tcp/22 from `0.0.0.0/0` PASS when the only range was a description. MOCKED `python3 -m pytest -q`: 114 passed, 1 skipped in 13.11s. CI for `4e8caee` is green on ubuntu-latest and windows-latest. Next: review PR 1.
