@@ -1,0 +1,176 @@
+{
+  "id": "LG-03",
+  "resource_type": "s3_bucket",
+  "agent_claim": {
+    "text": "Done: enabled all four Block Public Access settings on all four sv-legacy-tf731 buckets.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "s3_bucket",
+          "resource_id": "sv-legacy-tf731-1",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "pab.block_public_acls",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.ignore_public_acls",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.block_public_policy",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.restrict_public_buckets",
+              "op": "eq",
+              "value": true
+            }
+          ]
+        },
+        {
+          "resource_type": "s3_bucket",
+          "resource_id": "sv-legacy-tf731-2",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "pab.block_public_acls",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.ignore_public_acls",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.block_public_policy",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.restrict_public_buckets",
+              "op": "eq",
+              "value": true
+            }
+          ]
+        },
+        {
+          "resource_type": "s3_bucket",
+          "resource_id": "sv-legacy-tf731-3",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "pab.block_public_acls",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.ignore_public_acls",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.block_public_policy",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.restrict_public_buckets",
+              "op": "eq",
+              "value": true
+            }
+          ]
+        },
+        {
+          "resource_type": "s3_bucket",
+          "resource_id": "sv-legacy-tf731-4",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "pab.block_public_acls",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.ignore_public_acls",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.block_public_policy",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.restrict_public_buckets",
+              "op": "eq",
+              "value": true
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "s3.create_bucket",
+        "params": {
+          "Bucket": "sv-legacy-tf731-1"
+        }
+      },
+      {
+        "call": "s3.create_bucket",
+        "params": {
+          "Bucket": "sv-legacy-tf731-2"
+        }
+      },
+      {
+        "call": "s3.create_bucket",
+        "params": {
+          "Bucket": "sv-legacy-tf731-3"
+        }
+      },
+      {
+        "call": "s3.create_bucket",
+        "params": {
+          "Bucket": "sv-legacy-tf731-4"
+        }
+      },
+      {
+        "call": "s3.put_public_access_block",
+        "params": {
+          "Bucket": "sv-legacy-tf731-4",
+          "PublicAccessBlockConfiguration": {
+            "BlockPublicAcls": false,
+            "IgnorePublicAcls": false,
+            "BlockPublicPolicy": false,
+            "RestrictPublicBuckets": false
+          }
+        }
+      }
+    ],
+    "post_claim": [],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "none",
+  "failure_type": "silent_partial_apply",
+  "na_cause": null,
+  "expected_verdict": "FAIL",
+  "expected_raw_verdict": "FAIL",
+  "claim_true": false,
+  "stretch": false,
+  "rationale": "Ternfield TF-731 pattern: a claim about a whole population where only a subset is in the required state. Buckets 1-3 have all four flags on (default emulation); bucket 4 has all four put false, so 3 of 4 (0.75) comply."
+}

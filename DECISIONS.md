@@ -197,3 +197,11 @@ Superseded by ADR 022. The union-covers-the-whole-target rule let a partial over
 **Reason.** Skipping a description-only range let tcp/22 from `0.0.0.0/0` pass when the only entry was `{"Description": "x"}`.
 
 **Revisit when.** The API shape for a range without a CIDR is rejected before this checker sees it.
+
+## ADR 026 — 2026-11-04 — A non-core file list needs --out
+
+**Decision.** `python -m eval.manifest --files` exits 2 unless `--out DIR` is also set. `--out` is the repo-relative directory for `manifest.json`, `MANIFEST.sha256`, and the `scenarios/` scan. `--created` and `--author` are accepted only together with `--out`. With neither `--files` nor `--out`, the tool still writes `eval/manifest.json` and `eval/MANIFEST.sha256` using `created` `2026-11-03` and `author` `Christopher`. The legacy cases under `eval/legacy/` are a separate set. They are not added to `CORE_FILES` and they are not part of the held-out pin.
+
+**Reason.** The writer always targeted `eval/`. Passing the legacy paths as `--files` would have replaced the core freeze, and `--check --files` would have reported every core scenario as extra.
+
+**Revisit when.** The runner selects a set by name and refuses to write the core record for any other name.

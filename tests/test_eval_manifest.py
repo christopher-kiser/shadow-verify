@@ -458,7 +458,14 @@ def test_cli_check_exits_2_on_mismatch(capsys):
         scenario.mkdir(parents=True)
         target = scenario / "S3-01.json"
         target.write_bytes(b"{}\n")
-        args = ["--root", str(work), "--files", "eval/scenarios/S3-01.json"]
+        args = [
+            "--root",
+            str(work),
+            "--out",
+            "eval",
+            "--files",
+            "eval/scenarios/S3-01.json",
+        ]
         assert main(args) == 0
         assert main(["--check", *args]) == 0
         target.write_bytes(b"{ }\n")
@@ -471,7 +478,9 @@ def test_cli_rejects_paths_outside_the_repo(tmp_path: Path, capsys):
 
     assert main(["--root", str(tmp_path)]) == 2
     assert "root escapes repository" in capsys.readouterr().err
-    assert main(["--files", "../outside.json"]) == 2
+    assert main(["--out", "eval", "--files", "../outside.json"]) == 2
     assert "path escapes repository" in capsys.readouterr().err
-    assert main(["--files", "/etc/passwd"]) == 2
+    assert main(["--out", "eval", "--files", "/etc/passwd"]) == 2
+    assert "path escapes repository" in capsys.readouterr().err
+    assert main(["--out", "../outside", "--files", "eval/scenarios/S3-01.json"]) == 2
     assert "path escapes repository" in capsys.readouterr().err

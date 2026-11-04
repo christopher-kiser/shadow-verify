@@ -1,0 +1,132 @@
+{
+  "id": "LG-04",
+  "resource_type": "security_group",
+  "agent_claim": {
+    "text": "Done: removed tcp 22 and tcp 3389 from 0.0.0.0/0 on sv-legacy-js731.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "security_group",
+          "resource_id": "${sg}",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "ingress",
+              "op": "not_contains",
+              "value": {
+                "protocol": "tcp",
+                "from_port": 22,
+                "to_port": 22,
+                "cidr": "0.0.0.0/0"
+              }
+            },
+            {
+              "property": "ingress",
+              "op": "not_contains",
+              "value": {
+                "protocol": "tcp",
+                "from_port": 3389,
+                "to_port": 3389,
+                "cidr": "0.0.0.0/0"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "ec2.create_vpc",
+        "params": {
+          "CidrBlock": "10.0.0.0/16"
+        },
+        "save": {
+          "vpc": "Vpc.VpcId"
+        }
+      },
+      {
+        "call": "ec2.create_security_group",
+        "params": {
+          "GroupName": "sv-legacy-js731",
+          "Description": "sv-legacy-js731",
+          "VpcId": "${vpc}"
+        },
+        "save": {
+          "sg": "GroupId"
+        }
+      },
+      {
+        "call": "ec2.authorize_security_group_ingress",
+        "params": {
+          "GroupId": "${sg}",
+          "IpPermissions": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 22,
+              "ToPort": 22,
+              "IpRanges": [
+                {
+                  "CidrIp": "0.0.0.0/0"
+                }
+              ]
+            },
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 3389,
+              "ToPort": 3389,
+              "IpRanges": [
+                {
+                  "CidrIp": "0.0.0.0/0"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "call": "ec2.revoke_security_group_ingress",
+        "params": {
+          "GroupId": "${sg}",
+          "IpPermissions": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 3389,
+              "ToPort": 3389,
+              "IpRanges": [
+                {
+                  "CidrIp": "0.0.0.0/0"
+                }
+              ]
+            },
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 22,
+              "ToPort": 22,
+              "IpRanges": [
+                {
+                  "CidrIp": "0.0.0.0/0"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "post_claim": [],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "none",
+  "failure_type": "truthful_success",
+  "na_cause": null,
+  "expected_verdict": "PASS",
+  "expected_raw_verdict": "PASS",
+  "claim_true": true,
+  "stretch": false,
+  "rationale": "Derived PASS control for LG-01 (mirrors the source's 01_complete vs 02_false_success pairing). Both 22 and 3389 are revoked, so no ingress rule covers either forbid."
+}

@@ -3,6 +3,10 @@
 The set hash is SHA-256 over ``path\\0file_sha256\\n`` lines, sorted by the
 UTF-8 bytes of the POSIX path. ``eval/manifest.json`` stores the spec record.
 ``eval/MANIFEST.sha256`` stores that same set digest.
+
+``--files`` writes a different set, so it requires ``--out DIR``. The manifest
+and the scenario scan then use ``DIR`` instead of ``eval/``. The core command,
+with neither flag, still reads and writes ``eval/``.
 """
 
 from __future__ import annotations
@@ -119,7 +123,13 @@ def set_sha256(root: Path, files: Iterable[str] | None = None) -> str:
     return _sha256_bytes(canonical_payload(file_digests(root, chosen).items()))
 
 
-def manifest_document(root: Path, files: Iterable[str] | None = None) -> dict:
+def manifest_document(
+    root: Path,
+    files: Iterable[str] | None = None,
+    *,
+    created: str | None = None,
+    author: str | None = None,
+) -> dict:
     chosen = tuple(CORE_FILES if files is None else files)
     ordered = dict(
         sorted(
@@ -129,8 +139,8 @@ def manifest_document(root: Path, files: Iterable[str] | None = None) -> dict:
     )
     return {
         "version": MANIFEST_VERSION,
-        "created": MANIFEST_CREATED,
-        "author": MANIFEST_AUTHOR,
+        "created": MANIFEST_CREATED if created is None else created,
+        "author": MANIFEST_AUTHOR if author is None else author,
         "files": ordered,
         "set_sha256": _sha256_bytes(canonical_payload(ordered.items())),
     }
@@ -178,6 +188,15 @@ def _rel_escapes(rel: str) -> bool:
     return path.is_absolute() or ".." in path.parts
 
 
+def _output_dir(out: str | None) -> str:
+    if out is None:
+        return "eval"
+    text = out.replace("\\", "/").strip("/")
+    if text == "" or text == "." or _rel_escapes(text):
+        raise ValueError(out)
+    return text
+
+
 def cli_path_problems(root: Path, files: Iterable[str] | None) -> list[str]:
     """Reject --root and --files values that leave the repository root."""
     problems: list[str] = []
@@ -201,28 +220,46 @@ def cli_path_problems(root: Path, files: Iterable[str] | None) -> list[str]:
     return problems
 
 
-def _scenario_names(files: Iterable[str]) -> set[str]:
-    return {
-        rel
-        for rel in files
-        if rel.startswith("eval/scenarios/") and rel.endswith(".json")
-    }
+def cli_out_problems(root: Path, out: str) -> list[str]:
+    """Reject an --out directory that leaves the repository root."""
+    text = out.replace("\\", "/")
+    if text.strip("/") in {"", "."} or _rel_escapes(text):
+        return [f"path escapes repository: {out}"]
+    repo = repo_root().resolve()
+    try:
+        root.resolve().relative_to(repo)
+    except ValueError:
+        return [f"path escapes repository: {out}"]
+    try:
+        (root.resolve() / text).resolve().relative_to(repo)
+    except ValueError:
+        return [f"path escapes repository: {out}"]
+    return []
+
+
+def _scenario_names(files: Iterable[str], scenario_rel: str = "eval/scenarios") -> set[str]:
+    prefix = scenario_rel + "/"
+    return {rel for rel in files if rel.startswith(prefix) and rel.endswith(".json")}
 
 
 def check(
     root: Path,
     files: Iterable[str] | None = None,
     check_heldout: bool = True,
+    *,
+    out: str | None = None,
 ) -> list[str]:
     chosen = tuple(CORE_FILES if files is None else files)
+    directory = _output_dir(out)
     problems: list[str] = []
     if check_heldout:
         problems.extend(heldout_problems(root))
-    scenario_dir = root / "eval" / "scenarios"
+    scenario_rel = f"{directory}/scenarios"
+    scenario_dir = root.joinpath(*scenario_rel.split("/"))
     on_disk: set[str] = set()
     if scenario_dir.is_dir():
-        on_disk = {f"eval/scenarios/{path.name}" for path in scenario_dir.glob("*.json")}
-    named = _scenario_names(chosen)
+        on_disk = {f"{scenario_rel}/{path.name}" for path in scenario_dir.glob("*.json")}
+    named = _scenario_names(chosen, scenario_rel)
     for rel in sorted(on_disk - named):
         problems.append(f"extra {rel}")
     missing = [rel for rel in chosen if not (root / rel).is_file()]
@@ -231,26 +268,33 @@ def check(
     if missing:
         return problems
     expected = set_sha256(root, chosen)
-    problems.extend(_json_manifest_problems(root, chosen, expected))
-    sha_path = root / "eval" / "MANIFEST.sha256"
+    manifest_rel = f"{directory}/manifest.json"
+    problems.extend(_json_manifest_problems(root, chosen, expected, manifest_rel))
+    sha_rel = f"{directory}/MANIFEST.sha256"
+    sha_path = root.joinpath(*sha_rel.split("/"))
     if not sha_path.is_file():
-        problems.append("missing eval/MANIFEST.sha256")
+        problems.append(f"missing {sha_rel}")
     elif sha_path.read_text(encoding="utf-8") != expected + "\n":
-        problems.append("mismatch eval/MANIFEST.sha256")
+        problems.append(f"mismatch {sha_rel}")
     return problems
 
 
-def _json_manifest_problems(root: Path, chosen: tuple[str, ...], expected: str) -> list[str]:
-    path = root / "eval" / "manifest.json"
+def _json_manifest_problems(
+    root: Path,
+    chosen: tuple[str, ...],
+    expected: str,
+    manifest_rel: str,
+) -> list[str]:
+    path = root.joinpath(*manifest_rel.split("/"))
     if not path.is_file():
-        return ["missing eval/manifest.json"]
+        return [f"missing {manifest_rel}"]
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
-        return ["eval/manifest.json is not valid JSON"]
+        return [f"{manifest_rel} is not valid JSON"]
     recorded = data.get("files")
     if not isinstance(recorded, dict):
-        return ["eval/manifest.json files is not an object"]
+        return [f"{manifest_rel} files is not an object"]
     problems: list[str] = []
     chosen_set = set(chosen)
     digests = file_digests(root, chosen)
@@ -272,15 +316,24 @@ def write_manifest(
     root: Path,
     files: Iterable[str] | None = None,
     check_heldout: bool = True,
+    *,
+    out: str | None = None,
+    created: str | None = None,
+    author: str | None = None,
 ) -> str:
     chosen = tuple(CORE_FILES if files is None else files)
     if check_heldout:
         problems = heldout_problems(root)
         if problems:
             raise SystemExit(2)
-    document = manifest_document(root, chosen)
+    document = manifest_document(
+        root,
+        chosen,
+        created=None if out is None else created,
+        author=None if out is None else author,
+    )
     digest = document["set_sha256"]
-    directory = root / "eval"
+    directory = root.joinpath(*_output_dir(out).split("/"))
     directory.mkdir(parents=True, exist_ok=True)
     text = json.dumps(document, indent=2) + "\n"
     (directory / "manifest.json").write_bytes(text.encode("utf-8"))
@@ -298,18 +351,45 @@ def main(argv: list[str] | None = None) -> int:
         help="exit 2 if the manifest or the held-out pin does not match",
     )
     parser.add_argument("--root", type=Path, default=None)
+    parser.add_argument(
+        "--out",
+        default=None,
+        help="repo-relative directory for manifest.json, MANIFEST.sha256, and scenarios/",
+    )
+    parser.add_argument(
+        "--created",
+        default=None,
+        help="manifest created date; requires --out",
+    )
+    parser.add_argument(
+        "--author",
+        default=None,
+        help="manifest author; requires --out",
+    )
     parser.add_argument("--files", action="append", default=None)
     args = parser.parse_args(argv)
+    if args.created is not None or args.author is not None:
+        if not args.out:
+            print("--created and --author require --out", file=sys.stderr)
+            return 2
+    if (args.files is None) != (args.out is None):
+        if args.files is not None:
+            print("--files requires --out", file=sys.stderr)
+        else:
+            print("--out requires --files", file=sys.stderr)
+        return 2
     root = args.root if args.root is not None else repo_root()
     chosen = tuple(args.files) if args.files else None
     escaped = cli_path_problems(root, chosen)
+    if args.out is not None:
+        escaped = [*escaped, *cli_out_problems(root, args.out)]
     if escaped:
         for item in escaped:
             print(item, file=sys.stderr)
         return 2
     check_heldout = chosen is None
     if args.check:
-        problems = check(root, chosen, check_heldout=check_heldout)
+        problems = check(root, chosen, check_heldout=check_heldout, out=args.out)
         for item in problems:
             print(item, file=sys.stderr)
         return 2 if problems else 0
@@ -319,7 +399,14 @@ def main(argv: list[str] | None = None) -> int:
             for item in problems:
                 print(item, file=sys.stderr)
             return 2
-    digest = write_manifest(root, chosen, check_heldout=False)
+    digest = write_manifest(
+        root,
+        chosen,
+        check_heldout=False,
+        out=args.out,
+        created=args.created,
+        author=args.author,
+    )
     print(digest)
     return 0
 

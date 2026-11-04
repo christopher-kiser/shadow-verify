@@ -4,9 +4,11 @@
 
 v0 is implemented on `cursor/shadow-verify-v0-a059`. The CLI reads a claims file, calls read-only AWS APIs for S3 public access, EC2 security group ingress, and IAM role trust / attached policies / star-admin, and writes a hashed evidence bundle. Verdicts are PASS, FAIL, or NOT ASSESSED. Rules only.
 
+The legacy eval set is data under `eval/legacy/`: scenarios `LG-01` through `LG-06`, provenance, and a manifest written with `python -m eval.manifest --out eval/legacy`. Sentinel labels are TODO. The core `set_sha256` is still `7b4cd4f1e447f0cee054c32aeaa5eafef3a670bd2e671b38f9316f69aa4af113`. The held-out pin is unchanged. `--files` without `--out` exits 2, so a legacy run cannot overwrite `eval/manifest.json`.
+
 ## Next step
 
-Review the pull request. The highest-value follow-up is whichever open question below should be locked before adding checkers.
+Sentinel labels `LG-01` through `LG-06` blind from the claim, the seed, and the condition. Then adjudicate, then write a new legacy manifest that includes the label files. The runner still does not score this set.
 
 ## Demonstrated
 
@@ -16,6 +18,8 @@ Local mocked run on Python 3.12.3 (Linux), 2026-11-03. Every AWS interaction in 
 python3 -m pytest -q
 114 passed, 1 skipped in 13.11s
 ```
+
+Legacy set, 2026-11-04, same interpreter. MOCKED. `python3 -m pytest -q`: 137 passed, 1 skipped. `python3 eval/manifest.py --check` exited 0. `python3 -m eval.manifest --check --out eval/legacy --files eval/legacy/scenarios/LG-01.json` through `LG-06.json` exited 0. No AWS account was used.
 
 MOCKED. The skip is `tests/test_live.py` because `SV_LIVE` is not set. Two mocked demo runs both exited 1 with `bundle_sha256` `39f3a4677a9830ced8d9b7ad7d325c0758e4783955832d46686381f62b5701b4`. `python -m pip_audit` in a clean virtualenv printed `No known vulnerabilities found`.
 
@@ -43,6 +47,9 @@ No AWS account was used. moto supplied the bucket.
 
 ## Not established
 
+- A scored run of `LG-01` through `LG-06`. This change does not seed or score them.
+- Sentinel's labels for the legacy set. The manifest names the six scenario files only.
+- Byte hashes of the source `ground_truth.json` files. Those blobs are not in this repository.
 - A real AWS account. Every PASS / FAIL / NOT ASSESSED result in the local suite is MOCKED.
 - Terraform value comparison. `--plan` only reports whether an address is in `resource_changes`.
 - CloudTrail.
@@ -70,3 +77,4 @@ No AWS account was used. moto supplied the bucket.
 - 2026-11-04 — ICMP matches on type and ignores the code. Protocol number `1` is icmp. Raw `IpProtocol` `6`, `17`, and `1` go through a botocore Stubber. Emptying the number map made those three cases PASS instead of FAIL; the map was restored. MOCKED `python3 -m pytest -q`: 108 passed, 1 skipped in 11.05s. CI for `bb2da38` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — A forbid of `all` / `-1` covers every protocol, then ports or ICMP type. Reverting that match made the tcp/22 and icmp type 8 world cases PASS instead of FAIL. CGNAT `100.64.0.0/10` still passes a world forbid. The job summary escapes claim text. MOCKED `python3 -m pytest -q`: 113 passed, 1 skipped in 11.88s. CI for `50d5a72` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — A range entry with no CIDR is `unresolvable_source` (NOT ASSESSED). Reverting that match made tcp/22 from `0.0.0.0/0` PASS when the only range was a description. MOCKED `python3 -m pytest -q`: 114 passed, 1 skipped in 13.11s. CI for `4e8caee` is green on ubuntu-latest and windows-latest. Next: review PR 1.
+- 2026-11-04 — Added `eval/legacy/` (`LG-01` through `LG-06`) and `--out` so `--files` cannot overwrite the core manifest. Labels are TODO. MOCKED `python3 -m pytest -q`: 137 passed, 1 skipped in 13.77s. `python3 eval/manifest.py --check` exited 0. Core set hash and held-out pin unchanged. Next: Sentinel labels the six cases blind.
