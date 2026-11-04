@@ -14,7 +14,8 @@ Freeze order: label, adjudicate, freeze, then first run.
 - `labels/sentinel.json` is the second labeler's file, copied verbatim.
 - `labels/adjudication.md` records the one failure-type disagreement (`CF-04`).
 - `labels/known_gaps.json` is `["CF-02"]`.
-- `MANIFEST.sha256` is the core set hash from `python -m eval.manifest`.
+- `manifest.json` is the core freeze record from `python -m eval.manifest`: `version`, `created`, `author`, a sha256 for each named file, and `set_sha256`.
+- `MANIFEST.sha256` is that same `set_sha256`, on one line.
 - `heldout.manifest.json` and `heldout/MANIFEST.sha256` pin the held-out set. The case files are not in this repo. The pinned `set_sha256` is `69fda69f4d2716d9f5ece79724f13d415bee268fd40990db0b3d4ca147a3bb37`.
 
 The core manifest names exactly the scenario files, `labels/sentinel.json`, `labels/adjudication.md`, and `labels/known_gaps.json`. Paths are POSIX, sorted by UTF-8 bytes. Check it with:
@@ -23,6 +24,6 @@ The core manifest names exactly the scenario files, `labels/sentinel.json`, `lab
 python -m eval.manifest --check
 ```
 
-A mismatch exits 2. The held-out pin is checked there too, and a wrong `set_sha256` fails the check.
+A mismatch exits 2 and names the file whose bytes no longer match. The held-out pin is checked there too, and a wrong `set_sha256` fails the check.
 
 Scenarios are author-designed, not real agent traces. Labeled OFFLINE.

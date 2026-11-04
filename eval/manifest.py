@@ -1,7 +1,8 @@
 """Core eval manifest. Stdlib only. OFFLINE: no AWS and no network.
 
 The set hash is SHA-256 over ``path\\0file_sha256\\n`` lines, sorted by the
-UTF-8 bytes of the POSIX path. ``eval/MANIFEST.sha256`` stores that hex digest.
+UTF-8 bytes of the POSIX path. ``eval/manifest.json`` stores the spec record.
+``eval/MANIFEST.sha256`` stores that same set digest.
 """
 
 from __future__ import annotations
@@ -16,6 +17,12 @@ from pathlib import Path, PurePosixPath
 
 HELD_OUT_PIN = "69fda69f4d2716d9f5ece79724f13d415bee268fd40990db0b3d4ca147a3bb37"
 HELD_OUT_ID = re.compile(r"^HB-\d{2}$")
+_DRIVE = re.compile(r"^[A-Za-z]:")
+
+# Spec section 6. Christopher commits the freeze record.
+MANIFEST_VERSION = 1
+MANIFEST_CREATED = "2026-11-03"
+MANIFEST_AUTHOR = "Christopher"
 
 # Named explicitly. The hash sorts these by UTF-8 bytes; this tuple is already
 # in that order. Do not discover files with a glob at hash time.
@@ -103,13 +110,35 @@ def _read_bytes(root: Path, rel: str) -> bytes:
     return (root / rel).read_bytes()
 
 
+def file_digests(root: Path, files: Iterable[str]) -> dict[str, str]:
+    return {rel: _sha256_bytes(_read_bytes(root, rel)) for rel in files}
+
+
 def set_sha256(root: Path, files: Iterable[str] | None = None) -> str:
     chosen = tuple(CORE_FILES if files is None else files)
-    entries = [(rel, _sha256_bytes(_read_bytes(root, rel))) for rel in chosen]
-    return _sha256_bytes(canonical_payload(entries))
+    return _sha256_bytes(canonical_payload(file_digests(root, chosen).items()))
+
+
+def manifest_document(root: Path, files: Iterable[str] | None = None) -> dict:
+    chosen = tuple(CORE_FILES if files is None else files)
+    ordered = dict(
+        sorted(
+            file_digests(root, chosen).items(),
+            key=lambda item: item[0].encode("utf-8"),
+        )
+    )
+    return {
+        "version": MANIFEST_VERSION,
+        "created": MANIFEST_CREATED,
+        "author": MANIFEST_AUTHOR,
+        "files": ordered,
+        "set_sha256": _sha256_bytes(canonical_payload(ordered.items())),
+    }
 
 
 def is_void_heldout(digest: str) -> bool:
+    # The retired H-01..H-10 set (231a58c6…70aa0) may have been exposed.
+    # A pin of that hash must fail instead of being run.
     return digest.startswith("231a58c6") and digest.endswith("70aa0")
 
 
@@ -139,6 +168,37 @@ def heldout_problems(root: Path) -> list[str]:
 
 def _stem(rel: str) -> str:
     return PurePosixPath(rel.replace("\\", "/")).stem
+
+
+def _rel_escapes(rel: str) -> bool:
+    text = rel.replace("\\", "/")
+    if text.startswith("/") or _DRIVE.match(text):
+        return True
+    path = PurePosixPath(text)
+    return path.is_absolute() or ".." in path.parts
+
+
+def cli_path_problems(root: Path, files: Iterable[str] | None) -> list[str]:
+    """Reject --root and --files values that leave the repository root."""
+    problems: list[str] = []
+    repo = repo_root().resolve()
+    try:
+        root.resolve().relative_to(repo)
+    except ValueError:
+        problems.append(f"root escapes repository: {root}")
+    if not files:
+        return problems
+    for rel in files:
+        if _rel_escapes(rel):
+            problems.append(f"path escapes repository: {rel}")
+            continue
+        if problems and not root.resolve().is_relative_to(repo):
+            continue
+        try:
+            (root.resolve() / rel).resolve().relative_to(repo)
+        except ValueError:
+            problems.append(f"path escapes repository: {rel}")
+    return problems
 
 
 def _scenario_names(files: Iterable[str]) -> set[str]:
@@ -171,13 +231,40 @@ def check(
     if missing:
         return problems
     expected = set_sha256(root, chosen)
-    manifest_path = root / "eval" / "MANIFEST.sha256"
-    if not manifest_path.is_file():
+    problems.extend(_json_manifest_problems(root, chosen, expected))
+    sha_path = root / "eval" / "MANIFEST.sha256"
+    if not sha_path.is_file():
         problems.append("missing eval/MANIFEST.sha256")
-        return problems
-    text = manifest_path.read_text(encoding="utf-8")
-    if text != expected + "\n":
-        problems.append("manifest mismatch")
+    elif sha_path.read_text(encoding="utf-8") != expected + "\n":
+        problems.append("mismatch eval/MANIFEST.sha256")
+    return problems
+
+
+def _json_manifest_problems(root: Path, chosen: tuple[str, ...], expected: str) -> list[str]:
+    path = root / "eval" / "manifest.json"
+    if not path.is_file():
+        return ["missing eval/manifest.json"]
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ["eval/manifest.json is not valid JSON"]
+    recorded = data.get("files")
+    if not isinstance(recorded, dict):
+        return ["eval/manifest.json files is not an object"]
+    problems: list[str] = []
+    chosen_set = set(chosen)
+    digests = file_digests(root, chosen)
+    for rel in chosen:
+        seen = recorded.get(rel)
+        if seen is None:
+            problems.append(f"missing from manifest {rel}")
+        elif seen != digests[rel]:
+            problems.append(f"mismatch {rel}")
+    for rel in recorded:
+        if rel not in chosen_set:
+            problems.append(f"extra in manifest {rel}")
+    if data.get("set_sha256") != expected:
+        problems.append("set_sha256 mismatch")
     return problems
 
 
@@ -191,10 +278,13 @@ def write_manifest(
         problems = heldout_problems(root)
         if problems:
             raise SystemExit(2)
-    digest = set_sha256(root, chosen)
-    path = root / "eval" / "MANIFEST.sha256"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes((digest + "\n").encode("ascii"))
+    document = manifest_document(root, chosen)
+    digest = document["set_sha256"]
+    directory = root / "eval"
+    directory.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(document, indent=2) + "\n"
+    (directory / "manifest.json").write_bytes(text.encode("utf-8"))
+    (directory / "MANIFEST.sha256").write_bytes((digest + "\n").encode("ascii"))
     return digest
 
 
@@ -212,6 +302,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     root = args.root if args.root is not None else repo_root()
     chosen = tuple(args.files) if args.files else None
+    escaped = cli_path_problems(root, chosen)
+    if escaped:
+        for item in escaped:
+            print(item, file=sys.stderr)
+        return 2
     check_heldout = chosen is None
     if args.check:
         problems = check(root, chosen, check_heldout=check_heldout)

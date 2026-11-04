@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import tempfile
 from pathlib import Path
 
 from eval.manifest import (
@@ -399,13 +400,22 @@ def test_manifest_matches():
     assert check(ROOT) == []
     recorded = (ROOT / "eval" / "MANIFEST.sha256").read_text(encoding="utf-8").strip()
     assert recorded == set_sha256(ROOT)
-    assert re.fullmatch(r"[0-9a-f]{64}", recorded)
+    assert recorded == "7b4cd4f1e447f0cee054c32aeaa5eafef3a670bd2e671b38f9316f69aa4af113"
+    document = json.loads((ROOT / "eval" / "manifest.json").read_text(encoding="utf-8"))
+    assert document["version"] == 1
+    assert document["created"] == "2026-11-03"
+    assert document["author"] == "Christopher"
+    assert document["set_sha256"] == recorded
+    assert list(document["files"]) == list(CORE_FILES)
+    for rel, digest in document["files"].items():
+        assert _sha256(ROOT / rel) == digest
 
 
 def test_byte_sort_not_casefold():
-    entries = [("eval/B.json", "aa"), ("eval/a.json", "bb")]
+    # Byte order is B then a. The input is the reverse, so a missing sort fails.
+    entries = [("eval/a.json", "bb"), ("eval/B.json", "aa")]
     payload = canonical_payload(entries)
-    assert payload.startswith(b"eval/B.json\0aa\n")
+    assert payload == b"eval/B.json\0aa\neval/a.json\0bb\n"
     casefold = sorted(entries, key=lambda item: item[0].casefold())
     assert [item[0] for item in casefold] == ["eval/a.json", "eval/B.json"]
 
@@ -425,7 +435,8 @@ def test_named_files_are_exact(tmp_path: Path):
     assert check(root, files, check_heldout=False) == []
     target = root / "eval" / "scenarios" / "S3-01.json"
     target.write_bytes(b"{}\n ")
-    assert check(root, files, check_heldout=False)
+    problems = check(root, files, check_heldout=False)
+    assert "mismatch eval/scenarios/S3-01.json" in problems
     target.write_bytes(b"{}\n")
     (root / "eval" / "MANIFEST.sha256").write_text(digest + "\n", encoding="utf-8")
     extra = root / "eval" / "scenarios" / "EXTRA.json"
@@ -438,19 +449,29 @@ def test_named_files_are_exact(tmp_path: Path):
     assert any("missing" in item for item in problems)
 
 
-def test_cli_check_exits_2_on_mismatch(tmp_path: Path):
+def test_cli_check_exits_2_on_mismatch(capsys):
     from eval.manifest import main
 
-    scenario = tmp_path / "eval" / "scenarios"
-    scenario.mkdir(parents=True)
-    (scenario / "S3-01.json").write_bytes(b"{}\n")
-    assert main(["--root", str(tmp_path), "--files", "eval/scenarios/S3-01.json"]) == 0
-    assert (
-        main(["--check", "--root", str(tmp_path), "--files", "eval/scenarios/S3-01.json"])
-        == 0
-    )
-    (scenario / "S3-01.json").write_bytes(b"{ }\n")
-    assert (
-        main(["--check", "--root", str(tmp_path), "--files", "eval/scenarios/S3-01.json"])
-        == 2
-    )
+    with tempfile.TemporaryDirectory(dir=ROOT) as raw:
+        work = Path(raw)
+        scenario = work / "eval" / "scenarios"
+        scenario.mkdir(parents=True)
+        target = scenario / "S3-01.json"
+        target.write_bytes(b"{}\n")
+        args = ["--root", str(work), "--files", "eval/scenarios/S3-01.json"]
+        assert main(args) == 0
+        assert main(["--check", *args]) == 0
+        target.write_bytes(b"{ }\n")
+        assert main(["--check", *args]) == 2
+    assert "mismatch eval/scenarios/S3-01.json" in capsys.readouterr().err
+
+
+def test_cli_rejects_paths_outside_the_repo(tmp_path: Path, capsys):
+    from eval.manifest import main
+
+    assert main(["--root", str(tmp_path)]) == 2
+    assert "root escapes repository" in capsys.readouterr().err
+    assert main(["--files", "../outside.json"]) == 2
+    assert "path escapes repository" in capsys.readouterr().err
+    assert main(["--files", "/etc/passwd"]) == 2
+    assert "path escapes repository" in capsys.readouterr().err
