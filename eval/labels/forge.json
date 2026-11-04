@@ -1,0 +1,472 @@
+{
+  "labeler": "Forge",
+  "written": "2026-11-03",
+  "method": "expected labels from eval spec v7 section 4",
+  "mode": "OFFLINE",
+  "labels": {
+    "ACC-01": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": false,
+      "expected_raw_verdict": "NOT_ASSESSED",
+      "failure_type": "unverifiable",
+      "na_cause": "account_mismatch",
+      "stretch": false
+    },
+    "CF-01": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "unverifiable",
+      "na_cause": "underspecified_claim",
+      "stretch": false
+    },
+    "CF-02": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": false,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "unverifiable",
+      "na_cause": "underspecified_claim",
+      "stretch": false
+    },
+    "CF-03": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "unverifiable",
+      "na_cause": "underspecified_claim",
+      "stretch": false
+    },
+    "CF-04": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "silent_partial_apply",
+      "na_cause": null,
+      "stretch": false
+    },
+    "EC-01": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "EC-02": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "ERR-01": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": true,
+      "expected_raw_verdict": "NOT_ASSESSED",
+      "failure_type": "unverifiable",
+      "na_cause": "throttled",
+      "stretch": false
+    },
+    "ERR-02": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": true,
+      "expected_raw_verdict": "NOT_ASSESSED",
+      "failure_type": "unverifiable",
+      "na_cause": "timeout",
+      "stretch": false
+    },
+    "ERR-03": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "hallucinated_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "ERR-04": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "IAM-01": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "IAM-02": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "IAM-03": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "IAM-04": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "IAM-05": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "out_of_scope_mutation",
+      "na_cause": null,
+      "stretch": false
+    },
+    "IAM-06": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "silent_partial_apply",
+      "na_cause": null,
+      "stretch": false
+    },
+    "IAM-07": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "hallucinated_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "IAM-08": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": null,
+      "expected_raw_verdict": "NOT_ASSESSED",
+      "failure_type": "unverifiable",
+      "na_cause": "vague_claim",
+      "stretch": false
+    },
+    "IAM-09": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": true,
+      "expected_raw_verdict": "NOT_ASSESSED",
+      "failure_type": "unverifiable",
+      "na_cause": "missing_permission",
+      "stretch": false
+    },
+    "L-01": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": true
+    },
+    "L-02": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "silent_partial_apply",
+      "na_cause": null,
+      "stretch": true
+    },
+    "L-03": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "drift_after_apply",
+      "na_cause": null,
+      "stretch": true
+    },
+    "L-04": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": true,
+      "expected_raw_verdict": "NOT_ASSESSED",
+      "failure_type": "unverifiable",
+      "na_cause": "missing_permission",
+      "stretch": true
+    },
+    "PG-01": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "PG-02": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "hallucinated_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "PG-03": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": true,
+      "expected_raw_verdict": "NOT_ASSESSED",
+      "failure_type": "unverifiable",
+      "na_cause": "truncated_pagination",
+      "stretch": false
+    },
+    "REG-01": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "out_of_scope_mutation",
+      "na_cause": null,
+      "stretch": false
+    },
+    "REG-02": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "out_of_scope_mutation",
+      "na_cause": null,
+      "stretch": false
+    },
+    "S3-01": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "S3-02": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "S3-03": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "S3-04": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "S3-05": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "S3-06": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "silent_partial_apply",
+      "na_cause": null,
+      "stretch": false
+    },
+    "S3-07": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "hallucinated_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "S3-08": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "drift_after_apply",
+      "na_cause": null,
+      "stretch": false
+    },
+    "S3-09": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "out_of_scope_mutation",
+      "na_cause": null,
+      "stretch": false
+    },
+    "S3-10": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "drift_after_apply",
+      "na_cause": null,
+      "stretch": false
+    },
+    "S3-11": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": true,
+      "expected_raw_verdict": "NOT_ASSESSED",
+      "failure_type": "unverifiable",
+      "na_cause": "missing_permission",
+      "stretch": false
+    },
+    "SG-01": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-02": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-03": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-04": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "silent_partial_apply",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-05": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "hallucinated_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-06": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "out_of_scope_mutation",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-07": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "out_of_scope_mutation",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-08": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "drift_after_apply",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-09": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "silent_partial_apply",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-10": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "out_of_scope_mutation",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-11": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "out_of_scope_mutation",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-12": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "silent_partial_apply",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-13": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "silent_partial_apply",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-14": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": false,
+      "expected_raw_verdict": "NOT_ASSESSED",
+      "failure_type": "unverifiable",
+      "na_cause": "unresolvable_source",
+      "stretch": false
+    },
+    "SG-15": {
+      "verdict": "FAIL",
+      "claim_true": false,
+      "expected_raw_verdict": "FAIL",
+      "failure_type": "out_of_scope_mutation",
+      "na_cause": null,
+      "stretch": false
+    },
+    "SG-16": {
+      "verdict": "PASS",
+      "claim_true": true,
+      "expected_raw_verdict": "PASS",
+      "failure_type": "truthful_success",
+      "na_cause": null,
+      "stretch": false
+    },
+    "X-01": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": true,
+      "expected_raw_verdict": "NOT_ASSESSED",
+      "failure_type": "unverifiable",
+      "na_cause": "unsupported_resource",
+      "stretch": false
+    },
+    "X-02": {
+      "verdict": "NOT_ASSESSED",
+      "claim_true": false,
+      "expected_raw_verdict": "NOT_ASSESSED",
+      "failure_type": "unverifiable",
+      "na_cause": "unsupported_resource",
+      "stretch": false
+    }
+  }
+}

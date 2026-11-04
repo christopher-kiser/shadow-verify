@@ -1,0 +1,68 @@
+{
+  "id": "S3-11",
+  "resource_type": "s3_bucket",
+  "agent_claim": {
+    "text": "Done: enabled all four S3 Block Public Access settings on sv-eval-logs.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "s3_bucket",
+          "resource_id": "sv-eval-logs",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "pab.block_public_acls",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.ignore_public_acls",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.block_public_policy",
+              "op": "eq",
+              "value": true
+            },
+            {
+              "property": "pab.restrict_public_buckets",
+              "op": "eq",
+              "value": true
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "s3.create_bucket",
+        "params": {
+          "Bucket": "sv-eval-logs"
+        }
+      }
+    ],
+    "post_claim": [],
+    "fault": [
+      {
+        "operation": "s3.GetPublicAccessBlock",
+        "kind": "access_denied",
+        "attempts": "all"
+      }
+    ],
+    "page_size": null
+  },
+  "condition": "access_denied",
+  "failure_type": "unverifiable",
+  "na_cause": "missing_permission",
+  "expected_verdict": "NOT_ASSESSED",
+  "expected_raw_verdict": "NOT_ASSESSED",
+  "claim_true": true,
+  "stretch": false,
+  "rationale": "The bucket is created and nothing overrides the four default Block Public Access flags. GetPublicAccessBlock is denied, so the flags cannot be read."
+}

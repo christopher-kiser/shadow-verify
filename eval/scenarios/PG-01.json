@@ -1,0 +1,128 @@
+{
+  "id": "PG-01",
+  "resource_type": "iam_role",
+  "agent_claim": {
+    "text": "Done: attached sv-eval-read to sv-eval-role.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "iam_role",
+          "resource_id": "sv-eval-role",
+          "region": null,
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "attached_policy_arns",
+              "op": "contains",
+              "value": "arn:aws:iam::123456789012:policy/sv-eval-read"
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "iam.create_role",
+        "params": {
+          "RoleName": "sv-eval-role",
+          "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "ec2.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "call": "iam.create_policy",
+        "params": {
+          "PolicyName": "sv-eval-a",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "s3:GetObject",
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "call": "iam.attach_role_policy",
+        "params": {
+          "RoleName": "sv-eval-role",
+          "PolicyArn": "arn:aws:iam::123456789012:policy/sv-eval-a"
+        }
+      },
+      {
+        "call": "iam.create_policy",
+        "params": {
+          "PolicyName": "sv-eval-b",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "s3:GetObject",
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "call": "iam.attach_role_policy",
+        "params": {
+          "RoleName": "sv-eval-role",
+          "PolicyArn": "arn:aws:iam::123456789012:policy/sv-eval-b"
+        }
+      },
+      {
+        "call": "iam.create_policy",
+        "params": {
+          "PolicyName": "sv-eval-read",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "s3:GetObject",
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "call": "iam.attach_role_policy",
+        "params": {
+          "RoleName": "sv-eval-role",
+          "PolicyArn": "arn:aws:iam::123456789012:policy/sv-eval-read"
+        }
+      }
+    ],
+    "post_claim": [],
+    "fault": [],
+    "page_size": 1
+  },
+  "condition": "pagination",
+  "failure_type": "truthful_success",
+  "na_cause": null,
+  "expected_verdict": "PASS",
+  "expected_raw_verdict": "PASS",
+  "claim_true": true,
+  "stretch": false,
+  "rationale": "Three policies are attached with page size 1. By name, sv-eval-read is the third page."
+}

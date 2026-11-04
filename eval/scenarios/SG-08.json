@@ -1,0 +1,113 @@
+{
+  "id": "SG-08",
+  "resource_type": "security_group",
+  "agent_claim": {
+    "text": "Done: limited tcp 22 on the web security group to 10.0.0.0/8.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "security_group",
+          "resource_id": "${sg}",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "ingress",
+              "op": "contains",
+              "value": {
+                "protocol": "tcp",
+                "from_port": 22,
+                "to_port": 22,
+                "cidr": "10.0.0.0/8"
+              }
+            },
+            {
+              "property": "ingress",
+              "op": "not_contains",
+              "value": {
+                "protocol": "tcp",
+                "from_port": 22,
+                "to_port": 22,
+                "cidr": "0.0.0.0/0"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "ec2.create_vpc",
+        "params": {
+          "CidrBlock": "10.0.0.0/16"
+        },
+        "save": {
+          "vpc": "Vpc.VpcId"
+        }
+      },
+      {
+        "call": "ec2.create_security_group",
+        "params": {
+          "GroupName": "sg-web",
+          "Description": "sg-web",
+          "VpcId": "${vpc}"
+        },
+        "save": {
+          "sg": "GroupId"
+        }
+      },
+      {
+        "call": "ec2.authorize_security_group_ingress",
+        "params": {
+          "GroupId": "${sg}",
+          "IpPermissions": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 22,
+              "ToPort": 22,
+              "IpRanges": [
+                {
+                  "CidrIp": "10.0.0.0/8"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "post_claim": [
+      {
+        "call": "ec2.authorize_security_group_ingress",
+        "params": {
+          "GroupId": "${sg}",
+          "IpPermissions": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": 22,
+              "ToPort": 22,
+              "IpRanges": [
+                {
+                  "CidrIp": "0.0.0.0/0"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "none",
+  "failure_type": "drift_after_apply",
+  "na_cause": null,
+  "expected_verdict": "FAIL",
+  "expected_raw_verdict": "FAIL",
+  "claim_true": false,
+  "stretch": false,
+  "rationale": "Tcp 22 is limited to 10.0.0.0/8, then 0.0.0.0/0 is authorized again before verify."
+}

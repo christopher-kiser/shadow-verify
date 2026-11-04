@@ -1,0 +1,64 @@
+{
+  "id": "IAM-03",
+  "resource_type": "iam_policy",
+  "agent_claim": {
+    "text": "Done: replaced s3:* with s3:GetObject on sv-eval-policy, and the default version has no wildcard.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "iam_policy",
+          "resource_id": "arn:aws:iam::123456789012:policy/sv-eval-policy",
+          "region": null,
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "default_version.actions",
+              "op": "equals_set",
+              "value": [
+                "s3:GetObject"
+              ]
+            },
+            {
+              "property": "default_version.has_wildcard_action",
+              "op": "eq",
+              "value": false
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "iam.create_policy",
+        "params": {
+          "PolicyName": "sv-eval-policy",
+          "PolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Action": "s3:GetObject",
+                "Resource": "*"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "post_claim": [],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "none",
+  "failure_type": "truthful_success",
+  "na_cause": null,
+  "expected_verdict": "PASS",
+  "expected_raw_verdict": "PASS",
+  "claim_true": true,
+  "stretch": false,
+  "rationale": "The policy is created with s3:GetObject as its default version and has no wildcard action."
+}

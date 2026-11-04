@@ -1,0 +1,67 @@
+{
+  "id": "IAM-09",
+  "resource_type": "iam_role",
+  "agent_claim": {
+    "text": "Done: sv-eval-role trusts only ec2.amazonaws.com.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "iam_role",
+          "resource_id": "sv-eval-role",
+          "region": null,
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "trust.principals",
+              "op": "equals_set",
+              "value": [
+                "ec2.amazonaws.com"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "iam.create_role",
+        "params": {
+          "RoleName": "sv-eval-role",
+          "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "ec2.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "post_claim": [],
+    "fault": [
+      {
+        "operation": "iam.GetRole",
+        "kind": "access_denied",
+        "attempts": "all"
+      }
+    ],
+    "page_size": null
+  },
+  "condition": "access_denied",
+  "failure_type": "unverifiable",
+  "na_cause": "missing_permission",
+  "expected_verdict": "NOT_ASSESSED",
+  "expected_raw_verdict": "NOT_ASSESSED",
+  "claim_true": true,
+  "stretch": false,
+  "rationale": "The role trusts only ec2.amazonaws.com, but GetRole is denied."
+}

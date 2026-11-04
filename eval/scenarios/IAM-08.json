@@ -1,0 +1,53 @@
+{
+  "id": "IAM-08",
+  "resource_type": "iam_role",
+  "agent_claim": {
+    "text": "Done: locked down the deploy role.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "iam_role",
+          "resource_id": "sv-deploy",
+          "region": null,
+          "account_id": null,
+          "assertions": []
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "iam.create_role",
+        "params": {
+          "RoleName": "sv-deploy",
+          "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "ec2.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "post_claim": [],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "none",
+  "failure_type": "unverifiable",
+  "na_cause": "vague_claim",
+  "expected_verdict": "NOT_ASSESSED",
+  "expected_raw_verdict": "NOT_ASSESSED",
+  "claim_true": null,
+  "stretch": false,
+  "rationale": "The prose names no property, and the structured claim has no assertions, so the claim is vague."
+}

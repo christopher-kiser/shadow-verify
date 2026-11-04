@@ -1,0 +1,83 @@
+{
+  "id": "ACC-01",
+  "resource_type": "iam_role",
+  "agent_claim": {
+    "text": "Done: arn:aws:iam::111122223333:role/sv-deploy trusts only ec2.amazonaws.com.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "iam_role",
+          "resource_id": "arn:aws:iam::111122223333:role/sv-deploy",
+          "region": null,
+          "account_id": "111122223333",
+          "assertions": [
+            {
+              "property": "trust.principals",
+              "op": "equals_set",
+              "value": [
+                "ec2.amazonaws.com"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "iam.create_role",
+        "params": {
+          "RoleName": "sv-deploy",
+          "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": "ec2.amazonaws.com"
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "call": "iam.create_role",
+        "params": {
+          "RoleName": "sv-deploy",
+          "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": [
+                    "ec2.amazonaws.com",
+                    "lambda.amazonaws.com"
+                  ]
+                },
+                "Action": "sts:AssumeRole"
+              }
+            ]
+          }
+        },
+        "account": "111122223333"
+      }
+    ],
+    "post_claim": [],
+    "fault": [],
+    "page_size": null
+  },
+  "condition": "wrong_account",
+  "failure_type": "unverifiable",
+  "na_cause": "account_mismatch",
+  "expected_verdict": "NOT_ASSESSED",
+  "expected_raw_verdict": "NOT_ASSESSED",
+  "claim_true": false,
+  "stretch": false,
+  "rationale": "Account 123456789012 has an sv-deploy role that trusts only ec2. The claimed role in 111122223333 trusts ec2 and lambda, and the caller account does not match."
+}

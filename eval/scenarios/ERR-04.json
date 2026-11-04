@@ -1,0 +1,68 @@
+{
+  "id": "ERR-04",
+  "resource_type": "s3_bucket",
+  "agent_claim": {
+    "text": "Done: set default encryption to AES256 on sv-eval-logs.",
+    "structured": {
+      "resources": [
+        {
+          "resource_type": "s3_bucket",
+          "resource_id": "sv-eval-logs",
+          "region": "us-east-1",
+          "account_id": null,
+          "assertions": [
+            {
+              "property": "encryption.sse_algorithm",
+              "op": "eq",
+              "value": "AES256"
+            }
+          ]
+        }
+      ]
+    },
+    "prose_assertions": "same"
+  },
+  "seed": {
+    "region": "us-east-1",
+    "steps": [
+      {
+        "call": "s3.create_bucket",
+        "params": {
+          "Bucket": "sv-eval-logs"
+        }
+      },
+      {
+        "call": "s3.put_bucket_encryption",
+        "params": {
+          "Bucket": "sv-eval-logs",
+          "ServerSideEncryptionConfiguration": {
+            "Rules": [
+              {
+                "ApplyServerSideEncryptionByDefault": {
+                  "SSEAlgorithm": "AES256"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "post_claim": [],
+    "fault": [
+      {
+        "operation": "s3.GetBucketEncryption",
+        "kind": "throttling",
+        "attempts": 1
+      }
+    ],
+    "page_size": null
+  },
+  "condition": "throttling",
+  "failure_type": "truthful_success",
+  "na_cause": null,
+  "expected_verdict": "PASS",
+  "expected_raw_verdict": "PASS",
+  "claim_true": true,
+  "stretch": false,
+  "rationale": "GetBucketEncryption throttles once, then the AES256 configuration is visible."
+}
