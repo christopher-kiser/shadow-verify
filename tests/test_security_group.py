@@ -514,6 +514,20 @@ def test_all_protocol_forbid_covers_every_protocol(
     assert result.verdict == expected, result.reasons
 
 
+def test_ip_range_without_cidr_is_not_assessed():
+    result = _check_raw_permission(
+        {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "IpRanges": [{"Description": "x"}],
+        },
+        {"protocol": "tcp", "from_port": 22, "to_port": 22, "cidr": "0.0.0.0/0"},
+    )
+    assert result.verdict == Verdict.NOT_ASSESSED, result.reasons
+    assert any("unresolvable_source" in reason for reason in result.reasons)
+
+
 def test_icmp_all_types_matches_an_icmp_forbid():
     with mock_aws():
         group_id = _group(

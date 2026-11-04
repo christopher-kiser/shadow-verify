@@ -189,3 +189,11 @@ Superseded by ADR 022. The union-covers-the-whole-target rule let a partial over
 **Reason.** The claim schema accepts `all`, but the matcher treated that forbid as matching no specific protocol. TCP port 22 open to the world passed a forbid of every protocol and every port.
 
 **Revisit when.** A claim needs to forbid every protocol except one.
+
+## ADR 025 — 2026-11-04 — A range with no CIDR is not a pass
+
+**Decision.** An `IpRanges` or `Ipv6Ranges` entry that does not contain a CIDR string is `unresolvable_source` (NOT ASSESSED), the same as a prefix list or security-group source, unless another CIDR on that permission already fails.
+
+**Reason.** Skipping a description-only range let tcp/22 from `0.0.0.0/0` pass when the only entry was `{"Description": "x"}`.
+
+**Revisit when.** The API shape for a range without a CIDR is rejected before this checker sees it.

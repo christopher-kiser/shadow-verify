@@ -15,10 +15,10 @@ by any ingress permission. A permission covers a forbidden rule when:
   address fails it
 * any other forbid fails on any CIDR overlap
 
-A prefix list or security-group source on that port and protocol is
-``unresolvable_source`` (NOT ASSESSED) unless a CIDR on the same
-permission already fails. Sources in one ``IpPermissions`` entry are
-split before that judgment.
+A prefix list, a security-group source, or a range entry with no CIDR
+on that port and protocol is ``unresolvable_source`` (NOT ASSESSED)
+unless a CIDR on the same permission already fails. Sources in one
+``IpPermissions`` entry are split before that judgment.
 """
 
 from __future__ import annotations
@@ -118,7 +118,7 @@ def _protocol(value: object, index: int) -> str:
         if lowered in _PROTOCOLS:
             return lowered
     raise ClaimsError(
-        f"ingress_forbidden[{index}].protocol must be tcp, udp, icmp, all, or -1"
+        f"ingress_forbidden[{index}].protocol must be tcp, udp, icmp, icmpv6, all, or -1"
     )
 
 

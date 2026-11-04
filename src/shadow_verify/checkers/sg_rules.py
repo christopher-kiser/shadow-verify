@@ -37,7 +37,7 @@ def assess_forbid(index: int, rule: dict[str, Any], permissions: list) -> Proper
         return PropertyResult(
             name=name,
             verdict=Verdict.NOT_ASSESSED,
-            reason=f"unresolvable_source: prefix list or security group on {label}",
+            reason=f"unresolvable_source: prefix list, security group, or range without a CIDR on {label}",
         )
     if unknown:
         return PropertyResult(
@@ -112,8 +112,8 @@ def _sources(permission: dict) -> list[tuple[str, str]]:
             cidr = entry.get(field)
             if isinstance(cidr, str) and cidr:
                 found.append(("cidr", cidr))
-            elif cidr is not None:
-                found.append(("unknown", key))
+            else:
+                found.append(("unresolvable", key))
     return found
 
 
