@@ -1,4 +1,4 @@
-"""User-facing errors. These exit 2; they are not claim verdicts."""
+"""User-facing errors. A bad claims file exits 3. These are not claim verdicts."""
 
 
 class ShadowVerifyError(Exception):

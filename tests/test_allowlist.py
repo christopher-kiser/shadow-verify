@@ -52,15 +52,32 @@ def test_deny_list_matches_the_hard_coded_set():
 @pytest.mark.parametrize("pair", sorted(REQUIRED_DENIALS))
 def test_denied_call_is_refused_before_any_client_call(pair: str):
     service, operation = pair.split(":", 1)
-    aws = BotoAws(s3=BoomClient(), ec2=BoomClient(), iam=BoomClient(), evidence=EvidenceLog())
+    aws = BotoAws(
+        s3=BoomClient(),
+        ec2=BoomClient(),
+        iam=BoomClient(),
+        evidence=EvidenceLog(),
+        region="us-east-1",
+    )
     with pytest.raises(ShadowVerifyError, match="refusing denied"):
         aws._invoke(service, operation, BoomClient())
 
 
 def test_write_call_is_refused_before_any_client_call():
-    aws = BotoAws(s3=BoomClient(), ec2=BoomClient(), iam=BoomClient(), evidence=EvidenceLog())
+    aws = BotoAws(
+        s3=BoomClient(),
+        ec2=BoomClient(),
+        iam=BoomClient(),
+        evidence=EvidenceLog(),
+        region="us-east-1",
+    )
     with pytest.raises(ShadowVerifyError, match="refusing"):
         aws._invoke("s3", "PutBucketPolicy", BoomClient(), Bucket="logs-prod", Policy="{}")
+
+
+def test_client_region_argument_is_required():
+    with pytest.raises(TypeError):
+        BotoAws(s3=BoomClient(), ec2=BoomClient(), iam=BoomClient(), evidence=EvidenceLog())
 
 
 def test_bucket_location_is_allowed_and_secret_reads_stay_refused():

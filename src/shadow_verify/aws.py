@@ -129,7 +129,7 @@ class ApiResult:
 
 
 class BotoAws:
-    def __init__(self, *, s3, ec2, iam, evidence: EvidenceLog, region: str = "us-east-1") -> None:
+    def __init__(self, *, s3, ec2, iam, evidence: EvidenceLog, region: str) -> None:
         self._s3 = s3
         self._ec2 = ec2
         self._iam = iam

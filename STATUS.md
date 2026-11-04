@@ -2,7 +2,7 @@
 
 ## Current state
 
-v0 reads S3 public access, EC2 security group ingress, and IAM role trust / policies, and writes a hashed evidence bundle. Verdicts are PASS, FAIL, or NOT ASSESSED. Rules only. An `s3_bucket` check always reads `GetBucketLocation`. The claim `region`, or `--region` when the claim omits it, must match. `null` and `""` are `us-east-1`. `EU` is `eu-west-1`. A mismatch is FAIL (`region_mismatch`). A location read error is NOT ASSESSED.
+v0 reads S3 public access, EC2 security group ingress, and IAM role trust / policies, and writes a hashed evidence bundle. Verdicts are PASS, FAIL, or NOT ASSESSED. Rules only. An `s3_bucket` check always reads `GetBucketLocation`. The claim `region`, or `--region` when the claim omits it, must match. `null` and `""` are `us-east-1`. `EU` is `eu-west-1`. A mismatch is FAIL (`region_mismatch`). A location read error is NOT ASSESSED. `region` on any other resource type is a claims error (exit 3). A claim region must look like `us-east-1` or `us-gov-west-1`.
 
 ## Next step
 
@@ -14,12 +14,12 @@ Local mocked run on Python 3.12.3 (Linux), 2026-11-04. Every AWS interaction in 
 
 ```
 python3 -m pytest -q
-139 passed, 1 skipped in 12.13s
+152 passed, 1 skipped in 14.50s
 ```
 
-Exit code 0. A us-west-2 bucket checked from us-east-1 is FAIL (`region_mismatch`). Removing that comparison made `test_us_west_2_bucket_against_us_east_1_is_fail` return PASS; pytest exit code 1. Restoring it passed; pytest exit code 0. Core `set_sha256` is still `7b4cd4f1e447f0cee054c32aeaa5eafef3a670bd2e671b38f9316f69aa4af113`.
+Exit code 0. A us-west-2 bucket checked from us-east-1 is FAIL (`region_mismatch`). A security group or IAM role claim with `region: eu-west-1` is a claims error, exit 3, and does not PASS. Removing that rejection made those tests return exit 0; pytest exit code 1. Restoring it passed; pytest exit code 0. Core `set_sha256` is still `7b4cd4f1e447f0cee054c32aeaa5eafef3a670bd2e671b38f9316f69aa4af113`.
 
-MOCKED. The skip is `tests/test_live.py` because `SV_LIVE` is not set. Two mocked demo runs both exited 1 with `bundle_sha256` `b77dee1b3ff5e66bd9760f31439563ee20f585b4a60c3a73e094ae431805bf0f`.
+MOCKED. The skip is `tests/test_live.py` because `SV_LIVE` is not set. Two mocked demo runs both exited 1 with `bundle_sha256` `b77dee1b3ff5e66bd9760f31439563ee20f585b4a60c3a73e094ae431805bf0f`. That hash includes `tool_commit` and the absolute claims path, so another checkout produces a different digest.
 
 CI for `4e8caee` is green on `ubuntu-latest` and `windows-latest`:
 
@@ -75,3 +75,4 @@ The region change has not run in CI yet. The last green matrix for an earlier co
 - 2026-11-04 — A forbid of `all` / `-1` covers every protocol, then ports or ICMP type. Reverting that match made the tcp/22 and icmp type 8 world cases PASS instead of FAIL. CGNAT `100.64.0.0/10` still passes a world forbid. The job summary escapes claim text. MOCKED `python3 -m pytest -q`: 113 passed, 1 skipped in 11.88s. CI for `50d5a72` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — A range entry with no CIDR is `unresolvable_source` (NOT ASSESSED). Reverting that match made tcp/22 from `0.0.0.0/0` PASS when the only range was a description. MOCKED `python3 -m pytest -q`: 114 passed, 1 skipped in 13.11s. CI for `4e8caee` is green on ubuntu-latest and windows-latest. Next: review PR 1.
 - 2026-11-04 — S3 checks read `GetBucketLocation`. A us-west-2 bucket no longer PASSes a us-east-1 run. `null` and `""` are `us-east-1`; `EU` is `eu-west-1`. AccessDenied on the location is NOT ASSESSED. MOCKED `python3 -m pytest -q`: 139 passed, 1 skipped in 12.13s, exit 0. Break-it of the region comparison: pytest exit 1, then exit 0 after restore. Core `set_sha256` unchanged. Windows for this change is not run here. Next: review the region pull request.
+- 2026-11-04 — `region` is rejected at load time except on `s3_bucket` (exit 3). A security group in us-east-1 with `region: eu-west-1` no longer PASSes. Claim regions match `us-east-1` or `us-gov-west-1`; legacy `EU` stays a GetBucketLocation response only. MOCKED `python3 -m pytest -q`: 152 passed, 1 skipped in 14.50s, exit 0. Break-it of the type check: pytest exit 1 (CLI exit 0), then pytest exit 0 after restore. Next: wait for green ubuntu and windows CI.

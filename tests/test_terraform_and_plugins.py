@@ -100,7 +100,13 @@ def test_custom_checker_can_be_registered():
                     {"unused": True},
                 )
             ],
-            BotoAws(s3=object(), ec2=object(), iam=object(), evidence=EvidenceLog()),
+            BotoAws(
+                s3=object(),
+                ec2=object(),
+                iam=object(),
+                evidence=EvidenceLog(),
+                region="us-east-1",
+            ),
         )[0]
         assert result.verdict == Verdict.PASS
     finally:

@@ -90,7 +90,7 @@ CI for commit `4e8caee` is green on `ubuntu-latest` and `windows-latest`:
 
 A security-group source that is a prefix list or another security group is `unresolvable_source` and the claim is NOT ASSESSED, unless a CIDR on that same port and protocol already fails. v0 does not call `GetManagedPrefixListEntries`.
 
-S3 checks are the four public-access-block flags, `GetBucketPolicyStatus.IsPublic`, and the bucket region from `GetBucketLocation`. An empty location constraint is `us-east-1` and `EU` is `eu-west-1`. The claim `region`, or `--region` when the claim omits it, must match. A mismatch is FAIL. A location read error is NOT ASSESSED. These checks do not read object ACLs, the bucket ACL, or the account-level public access block. The IAM action for `GetPublicAccessBlock` is `s3:GetBucketPublicAccessBlock`. `GetBucketLocation` uses `s3:GetBucketLocation`.
+S3 checks are the four public-access-block flags, `GetBucketPolicyStatus.IsPublic`, and the bucket region from `GetBucketLocation`. An empty location constraint is `us-east-1` and `EU` is `eu-west-1`. The `s3_bucket` claim `region`, or `--region` when the claim omits it, must match. `region` on any other resource type is a claims error. A mismatch is FAIL. A location read error is NOT ASSESSED. These checks do not read object ACLs, the bucket ACL, or the account-level public access block. The IAM action for `GetPublicAccessBlock` is `s3:GetBucketPublicAccessBlock`. `GetBucketLocation` uses `s3:GetBucketLocation`.
 
 ## Development
 

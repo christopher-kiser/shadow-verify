@@ -204,4 +204,12 @@ Superseded by ADR 022. The union-covers-the-whole-target rule let a partial over
 
 **Reason.** `GetPublicAccessBlock` follows the bucket redirect, so a bucket in `us-west-2` matched a `us-east-1` run and the claim PASSed. The run region only selected the client endpoint. moto 5.2.5 also puts `LocationConstraint: null` on a `NoSuchBucket` error; treating that null as `us-east-1` would be another wrong PASS.
 
-**Revisit when.** A security group needs the same explicit region property. EC2 does not follow a cross-region redirect, so a group that exists only in another region stays NOT ASSESSED until an absence claim exists.
+**Revisit when.** A security group needs the same explicit region property. EC2 does not follow a cross-region redirect, so a group that exists only in another region stays NOT ASSESSED until an absence claim exists. Until that checker reads region, ADR 030 rejects the field at load time.
+
+## ADR 030 — 2026-11-04 — region is s3_bucket only
+
+**Decision.** `region` is accepted only on `s3_bucket`. Any other resource type that sets it is a `ClaimsError` at load time, which exits 3. A claim region must match `^[a-z]{2}(-gov)?-[a-z]+-\d$` (`us-east-1`, `us-gov-west-1`). The legacy `EU` value is accepted only as a `GetBucketLocation` response, where it means `eu-west-1`. The loader is the only place that validates the claim region.
+
+**Reason.** A security group claim with `region: eu-west-1`, run in `us-east-1` against a group that exists there, PASSed. The field was stored and never read. That is a wrong PASS. `EU` and `US-EAST-1` are not names the checker compares.
+
+**Revisit when.** Another checker reads region. Until then, setting `region` on that type stays a load error.

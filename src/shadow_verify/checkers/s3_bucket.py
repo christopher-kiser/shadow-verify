@@ -77,15 +77,8 @@ class S3BucketChecker:
 
 def _expected_region(claim: Claim, aws: BotoAws) -> str:
     if claim.region is not None:
-        if not isinstance(claim.region, str) or not claim.region.strip():
-            raise ClaimsError(f"s3_bucket claim {claim.id!r} region must be a non-empty string")
-        return claim.region.strip()
-    region = getattr(aws, "region", None)
-    if not isinstance(region, str) or not region.strip():
-        raise ClaimsError(
-            f"s3_bucket claim {claim.id!r} has no region; set region or pass --region"
-        )
-    return region.strip()
+        return claim.region
+    return aws.region
 
 
 def _normalize_location(value: object) -> str | None:
@@ -111,14 +104,7 @@ def _region_result(item, expected: str) -> PropertyResult:
             verdict=Verdict.NOT_ASSESSED,
             reason=call_failure("GetBucketLocation", item),
         )
-    response = item.view.get("response")
-    if not isinstance(response, dict):
-        return PropertyResult(
-            name="region",
-            verdict=Verdict.NOT_ASSESSED,
-            reason="GetBucketLocation response is not an object",
-        )
-    actual = _normalize_location(response.get("LocationConstraint"))
+    actual = _normalize_location(item.response.get("LocationConstraint"))
     if actual is None:
         return PropertyResult(
             name="region",
