@@ -83,6 +83,11 @@ runs:
         python - << 'PY'
         import json
         import os
+        import re
+
+        def escape_text(value):
+            text = str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            return re.sub(r"([\\`*_{}\[\]()#+\-.!|])", r"\\\1", text)
 
         path = os.environ.get("SV_RESULT", "")
         summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -90,7 +95,7 @@ runs:
             with open(path, encoding="utf-8") as handle:
                 report = json.load(handle)
         except (OSError, json.JSONDecodeError) as exc:
-            text = f"## Shadow Verify\n\nNo report was written ({exc}).\n"
+            text = f"## Shadow Verify\n\nNo report was written ({escape_text(exc)}).\n"
         else:
             counts = report["summary"]
             lines = [
@@ -102,9 +107,12 @@ runs:
                 "",
             ]
             for row in report["results"]:
-                lines.append(f"- **{row['verdict']}** `{row['id']}` — {row['statement']}")
+                verdict = escape_text(row["verdict"])
+                claim_id = escape_text(row["id"])
+                statement = escape_text(row["statement"])
+                lines.append(f"- **{verdict}** `{claim_id}` — {statement}")
                 for reason in row["reasons"]:
-                    lines.append(f"  - {reason}")
+                    lines.append(f"  - {escape_text(reason)}")
             lines.append("")
             lines.append("`agent_note` is untrusted and was not an input. Plan notes do not affect verdicts in v0.")
             text = "\n".join(lines) + "\n"

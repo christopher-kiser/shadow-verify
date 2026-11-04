@@ -321,6 +321,23 @@ def test_rfc1918_passes_a_world_forbid():
     assert result.verdict == Verdict.PASS, result.reasons
 
 
+def test_cgnat_passes_a_world_forbid():
+    with mock_aws():
+        group_id = _group(
+            [
+                {
+                    "IpProtocol": "tcp",
+                    "FromPort": 22,
+                    "ToPort": 22,
+                    "IpRanges": [{"CidrIp": "100.64.0.0/10"}],
+                }
+            ]
+        )
+        aws, _evidence = aws_stack()
+        result = CHECKER.check(claim("ec2_security_group", group_id, FORBID_SSH), aws)
+    assert result.verdict == Verdict.PASS, result.reasons
+
+
 def test_overlap_fails_a_private_forbid():
     with mock_aws():
         group_id = _group(
@@ -463,6 +480,38 @@ def test_raw_ip_protocol_numbers(number, protocol, from_port, to_port):
         },
     )
     assert result.verdict == Verdict.FAIL, result.reasons
+
+
+_FORBID_ALL_WORLD = {
+    "protocol": "all",
+    "from_port": 0,
+    "to_port": 65535,
+    "cidr": "0.0.0.0/0",
+}
+
+
+@pytest.mark.parametrize(
+    ("protocol", "from_port", "to_port", "cidr", "expected"),
+    [
+        ("tcp", 22, 22, "0.0.0.0/0", Verdict.FAIL),
+        ("icmp", 8, -1, "0.0.0.0/0", Verdict.FAIL),
+        ("-1", -1, -1, "0.0.0.0/0", Verdict.FAIL),
+        ("tcp", 22, 22, "10.0.0.0/8", Verdict.PASS),
+    ],
+)
+def test_all_protocol_forbid_covers_every_protocol(
+    protocol, from_port, to_port, cidr, expected
+):
+    result = _check_raw_permission(
+        {
+            "IpProtocol": protocol,
+            "FromPort": from_port,
+            "ToPort": to_port,
+            "IpRanges": [{"CidrIp": cidr}],
+        },
+        _FORBID_ALL_WORLD,
+    )
+    assert result.verdict == expected, result.reasons
 
 
 def test_icmp_all_types_matches_an_icmp_forbid():

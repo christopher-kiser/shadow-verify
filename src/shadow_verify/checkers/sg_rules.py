@@ -129,10 +129,10 @@ def _cidr_fails(
 
 
 def _covers(actual: str, expected: str) -> bool:
-    if actual == "-1":
+    """Either side being all protocols (``-1``) covers the other."""
+
+    if actual == "-1" or expected == "-1":
         return True
-    if expected == "-1":
-        return False
     return actual == expected
 
 
@@ -150,6 +150,7 @@ def _norm_protocol(value: object) -> str | None:
 
 
 def _ports_overlap(permission: dict, rule: dict[str, Any]) -> str:
+    # ICMP compares type. Protocol -1 matches on any overlapping port range.
     if _norm_protocol(permission.get("IpProtocol")) in _ICMP:
         return _icmp_type_matches(permission, rule)
     if "FromPort" not in permission and "ToPort" not in permission:

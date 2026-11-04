@@ -181,3 +181,11 @@ Superseded by ADR 022. The union-covers-the-whole-target rule let a partial over
 **Reason.** Treating type and code as a port range let echo type 8 with code 0 or code -1 pass a forbid of that type. A raw `IpProtocol` of `1` would pass an ICMP forbid if the number map omitted it.
 
 **Revisit when.** A claim needs to forbid one ICMP code.
+
+## ADR 024 — 2026-11-04 — A forbid of all protocols covers every protocol
+
+**Decision.** A forbid whose protocol is `all` or `-1` matches every permission protocol. Ports still apply after that. An `icmp` or `icmpv6` permission is compared by type. A permission whose protocol is `-1` matches when its port range overlaps the forbid.
+
+**Reason.** The claim schema accepts `all`, but the matcher treated that forbid as matching no specific protocol. TCP port 22 open to the world passed a forbid of every protocol and every port.
+
+**Revisit when.** A claim needs to forbid every protocol except one.
