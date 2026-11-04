@@ -39,16 +39,16 @@ No AWS account was used. moto supplied the bucket.
 
 ## CI
 
-`1b36fb5` is green on `ubuntu-latest` and `windows-latest`:
+`908b6c8` is green on `ubuntu-latest` and `windows-latest`:
 
-- https://github.com/christopher-kiser/shadow-verify/actions/runs/41867961405
+- https://github.com/christopher-kiser/shadow-verify/actions/runs/41868670603
 
-The format and FAIL-outranks follow-up is not in that run. Its CI has to be green on both runners before merge. PR #5 has not merged, so `python -m eval.run --all` has not been run on this branch.
+PR #5 has not merged, so `python -m eval.run --all` has not been run on this branch.
 
 ## Not established
 
 - A real AWS account. Every PASS / FAIL / NOT ASSESSED result in the local suite is MOCKED.
-- Windows for the format follow-up. `1b36fb5` is green on `windows-latest`. This session's later commit is not.
+- A real Windows session in this checkout. `908b6c8` is green on `windows-latest` in CI.
 - Terraform value comparison. `--plan` only reports whether an address is in `resource_changes`.
 - CloudTrail.
 - A signature on the evidence bundle. `shadow-verify verify` checks internal hashes only.
@@ -78,3 +78,4 @@ The format and FAIL-outranks follow-up is not in that run. Its CI has to be gree
 - 2026-11-04 — S3 checks read `GetBucketLocation`. A us-west-2 bucket no longer PASSes a us-east-1 run. `null` and `""` are `us-east-1`; `EU` is `eu-west-1`. AccessDenied on the location is NOT ASSESSED. MOCKED `python3 -m pytest -q`: 139 passed, 1 skipped in 12.13s, exit 0. Break-it of the region comparison: pytest exit 1, then exit 0 after restore. Core `set_sha256` unchanged. Windows for this change is not run here. Next: review the region pull request.
 - 2026-11-04 — `region` is rejected at load time except on `s3_bucket` (exit 3). A security group in us-east-1 with `region: eu-west-1` no longer PASSes. Claim regions match `us-east-1` or `us-gov-west-1`; legacy `EU` stays a GetBucketLocation response only. MOCKED `python3 -m pytest -q`: 152 passed, 1 skipped in 14.50s, exit 0. Break-it of the type check: pytest exit 1 (CLI exit 0), then pytest exit 0 after restore. Next: wait for green ubuntu and windows CI.
 - 2026-11-04 — Claim regions are lowercased, then matched with `^[a-z]{2}(-[a-z]+)+-\d+$`. `US-EAST-1` passes a us-east-1 bucket. A denied `GetBucketLocation` plus a false public-access flag is FAIL. Returning early on the denial made that test NOT ASSESSED; pytest exit 1. Restoring the flag check passed. MOCKED `python3 -m pytest -q`: 154 passed, 1 skipped in 14.78s, exit 0. `1b36fb5` CI is green on ubuntu and windows. PR #5 is still open, so the eval run waits.
+- 2026-11-04 — `908b6c8` CI is green on ubuntu-latest and windows-latest: https://github.com/christopher-kiser/shadow-verify/actions/runs/41868670603. PR #5 is still open, so the eval run still waits.
