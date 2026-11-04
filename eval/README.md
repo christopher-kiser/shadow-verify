@@ -30,4 +30,4 @@ Scenarios are author-designed, not real agent traces. Labeled OFFLINE.
 
 ## Legacy set
 
-`legacy/` holds six previously seen cases, `LG-01` through `LG-06`, translated from the raven-shadow-core qualification fixtures for Juniper, Selwick, and Ternfield. They are scored and reported in their own table. They are never part of the core set or the held-out set. `python -m eval.manifest --check` does not read them. The legacy record is `legacy/manifest.json`, checked with `--out eval/legacy` and `--files`. See `legacy/README.md`.
+`legacy/` holds six previously seen cases, `LG-01` through `LG-06`, translated from the raven-shadow-core qualification fixtures for Juniper, Selwick, and Ternfield. They are scored and reported in their own table. They are never part of the core set or the held-out set. `python -m eval.manifest --check` does not read them. Order for this set: label, then adjudicate, then write the manifest. The legacy manifest is not in this change. See `legacy/README.md`.

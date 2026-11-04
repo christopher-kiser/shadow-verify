@@ -5,13 +5,16 @@ UTF-8 bytes of the POSIX path. ``eval/manifest.json`` stores the spec record.
 ``eval/MANIFEST.sha256`` stores that same set digest.
 
 ``--files`` writes a different set, so it requires ``--out DIR``. The manifest
-and the scenario scan then use ``DIR`` instead of ``eval/``. The core command,
-with neither flag, still reads and writes ``eval/``.
+and the scenario scan then use ``DIR`` instead of ``eval/``. ``--out`` is
+resolved and refused, case-insensitively, when that directory is ``eval/``,
+``eval/scenarios``, ``eval/labels``, or ``eval/heldout``, or when the write
+would touch ``eval/manifest.json`` or ``eval/MANIFEST.sha256``. Every
+``--files`` path must resolve under ``--out``. The core command, with neither
+flag, still reads and writes ``eval/``.
 """
 
 from __future__ import annotations
 
-import argparse
 import hashlib
 import json
 import re
@@ -197,46 +200,6 @@ def _output_dir(out: str | None) -> str:
     return text
 
 
-def cli_path_problems(root: Path, files: Iterable[str] | None) -> list[str]:
-    """Reject --root and --files values that leave the repository root."""
-    problems: list[str] = []
-    repo = repo_root().resolve()
-    try:
-        root.resolve().relative_to(repo)
-    except ValueError:
-        problems.append(f"root escapes repository: {root}")
-    if not files:
-        return problems
-    for rel in files:
-        if _rel_escapes(rel):
-            problems.append(f"path escapes repository: {rel}")
-            continue
-        if problems and not root.resolve().is_relative_to(repo):
-            continue
-        try:
-            (root.resolve() / rel).resolve().relative_to(repo)
-        except ValueError:
-            problems.append(f"path escapes repository: {rel}")
-    return problems
-
-
-def cli_out_problems(root: Path, out: str) -> list[str]:
-    """Reject an --out directory that leaves the repository root."""
-    text = out.replace("\\", "/")
-    if text.strip("/") in {"", "."} or _rel_escapes(text):
-        return [f"path escapes repository: {out}"]
-    repo = repo_root().resolve()
-    try:
-        root.resolve().relative_to(repo)
-    except ValueError:
-        return [f"path escapes repository: {out}"]
-    try:
-        (root.resolve() / text).resolve().relative_to(repo)
-    except ValueError:
-        return [f"path escapes repository: {out}"]
-    return []
-
-
 def _scenario_names(files: Iterable[str], scenario_rel: str = "eval/scenarios") -> set[str]:
     prefix = scenario_rel + "/"
     return {rel for rel in files if rel.startswith(prefix) and rel.endswith(".json")}
@@ -329,8 +292,8 @@ def write_manifest(
     document = manifest_document(
         root,
         chosen,
-        created=None if out is None else created,
-        author=None if out is None else author,
+        created=created,
+        author=author,
     )
     digest = document["set_sha256"]
     directory = root.joinpath(*_output_dir(out).split("/"))
@@ -342,73 +305,17 @@ def write_manifest(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Compute or check the OFFLINE core eval manifest."
-    )
-    parser.add_argument(
-        "--check",
-        action="store_true",
-        help="exit 2 if the manifest or the held-out pin does not match",
-    )
-    parser.add_argument("--root", type=Path, default=None)
-    parser.add_argument(
-        "--out",
-        default=None,
-        help="repo-relative directory for manifest.json, MANIFEST.sha256, and scenarios/",
-    )
-    parser.add_argument(
-        "--created",
-        default=None,
-        help="manifest created date; requires --out",
-    )
-    parser.add_argument(
-        "--author",
-        default=None,
-        help="manifest author; requires --out",
-    )
-    parser.add_argument("--files", action="append", default=None)
-    args = parser.parse_args(argv)
-    if args.created is not None or args.author is not None:
-        if not args.out:
-            print("--created and --author require --out", file=sys.stderr)
-            return 2
-    if (args.files is None) != (args.out is None):
-        if args.files is not None:
-            print("--files requires --out", file=sys.stderr)
-        else:
-            print("--out requires --files", file=sys.stderr)
-        return 2
-    root = args.root if args.root is not None else repo_root()
-    chosen = tuple(args.files) if args.files else None
-    escaped = cli_path_problems(root, chosen)
-    if args.out is not None:
-        escaped = [*escaped, *cli_out_problems(root, args.out)]
-    if escaped:
-        for item in escaped:
-            print(item, file=sys.stderr)
-        return 2
-    check_heldout = chosen is None
-    if args.check:
-        problems = check(root, chosen, check_heldout=check_heldout, out=args.out)
-        for item in problems:
-            print(item, file=sys.stderr)
-        return 2 if problems else 0
-    if check_heldout:
-        problems = heldout_problems(root)
-        if problems:
-            for item in problems:
-                print(item, file=sys.stderr)
-            return 2
-    digest = write_manifest(
-        root,
-        chosen,
-        check_heldout=False,
-        out=args.out,
-        created=args.created,
-        author=args.author,
-    )
-    print(digest)
-    return 0
+    """Entry point for ``python -m eval.manifest`` and ``python eval/manifest.py``.
+
+    Running the file as a script puts ``eval/`` on ``sys.path``, not the
+    repository root, so the package import needs that root first.
+    """
+    root = str(Path(__file__).resolve().parent.parent)
+    if root not in sys.path:
+        sys.path.insert(0, root)
+    from eval.manifest_cli import main as cli_main
+
+    return cli_main(argv)
 
 
 if __name__ == "__main__":

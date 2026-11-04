@@ -7,14 +7,11 @@ from __future__ import annotations
 
 import json
 import re
-import tempfile
 from pathlib import Path
 
+from tests.helpers import CONDITIONS, SEED_ALLOWLIST
 from eval.manifest import (
     CORE_FILES,
-    HELD_OUT_PIN,
-    MANIFEST_AUTHOR,
-    MANIFEST_CREATED,
     check,
     heldout_problems,
     main,
@@ -25,39 +22,14 @@ ROOT = Path(__file__).resolve().parents[1]
 LEGACY = ROOT / "eval" / "legacy"
 SCENARIOS = LEGACY / "scenarios"
 CORE_SET = "7b4cd4f1e447f0cee054c32aeaa5eafef3a670bd2e671b38f9316f69aa4af113"
-LEGACY_CREATED = "2026-11-04"
-LEGACY_AUTHOR = "Forge"
 LEGACY_ID = re.compile(r"^LG-\d{2}$")
 
-# Spec section 2 SEED_ALLOWLIST, core calls only. Stretch calls are rejected.
-SEED_ALLOWLIST = {
-    "s3.create_bucket",
-    "s3.put_public_access_block",
-    "s3.put_bucket_encryption",
-    "s3.put_bucket_versioning",
-    "s3.put_bucket_policy",
-    "s3.delete_bucket_policy",
-    "kms.create_key",
-    "ec2.create_vpc",
-    "ec2.create_security_group",
-    "ec2.authorize_security_group_ingress",
-    "ec2.revoke_security_group_ingress",
-    "iam.create_role",
-    "iam.update_assume_role_policy",
-    "iam.create_policy",
-    "iam.create_policy_version",
-    "iam.attach_role_policy",
-    "iam.detach_role_policy",
-    "ec2.create_managed_prefix_list",
-    "dynamodb.create_table",
-    "sts.assume_role",
-}
-
-# Properties v0 reads today, in the eval scenario vocabulary.
-# security_group forbids map to ingress_forbidden. The four PAB flags are the
-# s3 checker. attached_policy_arns is the IAM set. Encryption, versioning,
-# security-group contains/equals_set, and iam_policy are outside this list.
-V0_OPS = {
+# Assertion shapes in the legacy files.
+# Security-group forbids map to ingress_forbidden. The four PAB flags are what
+# the S3 checker reads. LG-02 and LG-05 assert only attached_policy_arns.
+# v0's IAM checker requires trust_principals, attached_policy_arns, and
+# no_admin_star together, so those two cases cannot be run as written.
+SCENARIO_OPS = {
     "security_group": {"ingress": {"not_contains"}},
     "s3_bucket": {
         "pab.block_public_acls": {"eq"},
@@ -68,21 +40,6 @@ V0_OPS = {
     "iam_role": {"attached_policy_arns": {"equals_set"}},
 }
 
-CONDITIONS = {
-    "none",
-    "wrong_region",
-    "wrong_account",
-    "stale_read",
-    "access_denied",
-    "throttling",
-    "timeout",
-    "not_found",
-    "pagination",
-    "truncated_pagination",
-    "underspecified_claim",
-    "cidr_semantics",
-    "unresolvable_source",
-}
 FAILURE_TYPES = {
     "truthful_success",
     "silent_partial_apply",
@@ -101,27 +58,20 @@ def _legacy_files() -> tuple[str, ...]:
     return tuple(f"eval/legacy/scenarios/{name}" for name in names)
 
 
-def _file_args(files: tuple[str, ...]) -> list[str]:
-    args: list[str] = []
-    for rel in files:
-        args.extend(["--files", rel])
-    return args
-
-
-def _schema_problems(path: Path) -> list[str]:
-    raw = path.read_bytes()
+def _encoding_problems(name: str, raw: bytes) -> list[str]:
     problems: list[str] = []
     if b"\r" in raw:
-        problems.append(f"{path.name} has CR")
+        problems.append(f"{name} has CR")
     if not raw.endswith(b"\n"):
-        problems.append(f"{path.name} missing trailing newline")
-    try:
-        scenario = json.loads(raw.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        return [f"{path.name} is not utf-8 JSON: {exc}"]
+        problems.append(f"{name} missing trailing newline")
+    return problems
+
+
+def _identity_problems(path: Path, scenario: dict) -> tuple[str, list[str]]:
     example = json.loads(
         (ROOT / "eval" / "scenarios" / "SG-05.json").read_text(encoding="utf-8")
     )
+    problems: list[str] = []
     if set(scenario) != set(example):
         problems.append(f"{path.name} keys {sorted(set(scenario) ^ set(example))}")
     sid = scenario.get("id")
@@ -130,12 +80,17 @@ def _schema_problems(path: Path) -> list[str]:
     resource_type = scenario.get("resource_type")
     if not isinstance(resource_type, str) or re.fullmatch(r"[a-z0-9_]+", resource_type) is None:
         problems.append(f"{sid} resource_type")
-    if resource_type not in V0_OPS:
-        problems.append(f"{sid} resource_type {resource_type} is outside v0")
+    if resource_type not in SCENARIO_OPS:
+        problems.append(f"{sid} resource_type {resource_type} is not one of the legacy shapes")
+    return str(sid), problems
+
+
+def _claim_problems(sid: str, scenario: dict) -> list[str]:
+    resource_type = scenario.get("resource_type")
     claim = scenario.get("agent_claim")
     if not isinstance(claim, dict) or set(claim) != {"text", "structured", "prose_assertions"}:
-        problems.append(f"{sid} agent_claim")
-        return problems
+        return [f"{sid} agent_claim"]
+    problems: list[str] = []
     if not isinstance(claim.get("text"), str) or not claim["text"].strip():
         problems.append(f"{sid} empty text")
     if claim.get("prose_assertions") != "same":
@@ -143,43 +98,50 @@ def _schema_problems(path: Path) -> list[str]:
     structured = claim.get("structured")
     resources = structured.get("resources") if isinstance(structured, dict) else None
     if set(structured or {}) != {"resources"} or not isinstance(resources, list) or not resources:
-        problems.append(f"{sid} structured")
-        return problems
+        return [*problems, f"{sid} structured"]
     for index, resource in enumerate(resources):
-        if set(resource) != {
-            "resource_type",
-            "resource_id",
-            "region",
-            "account_id",
-            "assertions",
-        }:
-            problems.append(f"{sid} resource {index} keys")
+        problems.extend(_resource_problems(sid, resource_type, index, resource))
+    return problems
+
+
+def _resource_problems(sid: str, resource_type, index: int, resource: dict) -> list[str]:
+    if set(resource) != {
+        "resource_type",
+        "resource_id",
+        "region",
+        "account_id",
+        "assertions",
+    }:
+        return [f"{sid} resource {index} keys"]
+    problems: list[str] = []
+    if resource["resource_type"] != resource_type:
+        problems.append(f"{sid} resource {index} type")
+    if not isinstance(resource["resource_id"], str) or not resource["resource_id"]:
+        problems.append(f"{sid} resource {index} id")
+    region = resource["region"]
+    if resource_type == "iam_role":
+        if region is not None:
+            problems.append(f"{sid} iam region")
+    elif not isinstance(region, str) or not region:
+        problems.append(f"{sid} region")
+    if resource["account_id"] is not None:
+        problems.append(f"{sid} account_id")
+    assertions = resource["assertions"]
+    if not isinstance(assertions, list) or not assertions:
+        return [*problems, f"{sid} resource {index} assertions"]
+    allowed = SCENARIO_OPS.get(resource_type, {})
+    for assertion in assertions:
+        if set(assertion) != {"property", "op", "value"}:
+            problems.append(f"{sid} assertion keys")
             continue
-        if resource["resource_type"] != resource_type:
-            problems.append(f"{sid} resource {index} type")
-        if not isinstance(resource["resource_id"], str) or not resource["resource_id"]:
-            problems.append(f"{sid} resource {index} id")
-        region = resource["region"]
-        if resource_type == "iam_role":
-            if region is not None:
-                problems.append(f"{sid} iam region")
-        elif not isinstance(region, str) or not region:
-            problems.append(f"{sid} region")
-        if resource["account_id"] is not None:
-            problems.append(f"{sid} account_id")
-        assertions = resource["assertions"]
-        if not isinstance(assertions, list) or not assertions:
-            problems.append(f"{sid} resource {index} assertions")
-            continue
-        allowed = V0_OPS[resource_type]
-        for assertion in assertions:
-            if set(assertion) != {"property", "op", "value"}:
-                problems.append(f"{sid} assertion keys")
-                continue
-            prop = assertion["property"]
-            op = assertion["op"]
-            if prop not in allowed or op not in allowed[prop]:
-                problems.append(f"{sid} property {prop} op {op}")
+        prop = assertion["property"]
+        op = assertion["op"]
+        if prop not in allowed or op not in allowed[prop]:
+            problems.append(f"{sid} property {prop} op {op}")
+    return problems
+
+
+def _seed_problems(sid: str, scenario: dict, claim: dict) -> list[str]:
     seed = scenario.get("seed")
     if not isinstance(seed, dict) or set(seed) != {
         "region",
@@ -188,8 +150,8 @@ def _schema_problems(path: Path) -> list[str]:
         "fault",
         "page_size",
     }:
-        problems.append(f"{sid} seed")
-        return problems
+        return [f"{sid} seed"]
+    problems: list[str] = []
     if not isinstance(seed["region"], str) or not seed["region"]:
         problems.append(f"{sid} seed.region")
     if seed["page_size"] is not None:
@@ -201,25 +163,35 @@ def _schema_problems(path: Path) -> list[str]:
         problems.append(f"{sid} steps")
     else:
         for step in seed["steps"]:
-            if not isinstance(step, dict) or "call" not in step or "params" not in step:
-                problems.append(f"{sid} step")
-                continue
-            extra = set(step) - {"call", "params", "save", "region", "account"}
-            if extra:
-                problems.append(f"{sid} step keys {sorted(extra)}")
-            if step["call"] not in SEED_ALLOWLIST:
-                problems.append(f"{sid} call {step['call']}")
-            if not isinstance(step["params"], dict):
-                problems.append(f"{sid} params")
-            else:
-                problems.extend(_placeholder_problems(sid, step["params"], saves))
-            save = step.get("save")
-            if save is not None:
-                if not isinstance(save, dict) or not save:
-                    problems.append(f"{sid} save")
-                else:
-                    saves.update(str(key) for key in save)
+            problems.extend(_step_problems(sid, step, saves))
     problems.extend(_placeholder_problems(sid, claim, saves))
+    return problems
+
+
+def _step_problems(sid: str, step, saves: set[str]) -> list[str]:
+    if not isinstance(step, dict) or "call" not in step or "params" not in step:
+        return [f"{sid} step"]
+    problems: list[str] = []
+    extra = set(step) - {"call", "params", "save", "region", "account"}
+    if extra:
+        problems.append(f"{sid} step keys {sorted(extra)}")
+    if step["call"] not in SEED_ALLOWLIST:
+        problems.append(f"{sid} call {step['call']}")
+    if not isinstance(step["params"], dict):
+        problems.append(f"{sid} params")
+    else:
+        problems.extend(_placeholder_problems(sid, step["params"], saves))
+    save = step.get("save")
+    if save is not None:
+        if not isinstance(save, dict) or not save:
+            problems.append(f"{sid} save")
+        else:
+            saves.update(str(key) for key in save)
+    return problems
+
+
+def _label_problems(sid: str, scenario: dict) -> list[str]:
+    problems: list[str] = []
     if scenario.get("condition") not in CONDITIONS:
         problems.append(f"{sid} condition")
     if scenario.get("failure_type") not in FAILURE_TYPES:
@@ -241,6 +213,24 @@ def _schema_problems(path: Path) -> list[str]:
     return problems
 
 
+def _schema_problems(path: Path) -> list[str]:
+    raw = path.read_bytes()
+    problems = _encoding_problems(path.name, raw)
+    try:
+        scenario = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return [f"{path.name} is not utf-8 JSON: {exc}"]
+    sid, identity = _identity_problems(path, scenario)
+    problems.extend(identity)
+    claim = scenario.get("agent_claim")
+    if not isinstance(claim, dict):
+        return [*problems, f"{sid} agent_claim"]
+    problems.extend(_claim_problems(sid, scenario))
+    problems.extend(_seed_problems(sid, scenario, claim))
+    problems.extend(_label_problems(sid, scenario))
+    return problems
+
+
 def _placeholder_problems(sid: str, value, saves: set[str]) -> list[str]:
     found: list[str] = []
     if isinstance(value, str):
@@ -256,14 +246,6 @@ def _placeholder_problems(sid: str, value, saves: set[str]) -> list[str]:
     return found
 
 
-def _copy_tree(work: Path, rels: tuple[str, ...]) -> None:
-    for rel in rels:
-        source = ROOT / rel
-        target = work / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(source.read_bytes())
-
-
 def test_core_set_hash_and_check_ignore_legacy():
     assert set_sha256(ROOT) == CORE_SET
     assert check(ROOT) == []
@@ -274,7 +256,9 @@ def test_core_set_hash_and_check_ignore_legacy():
     assert all("LG-" not in rel for rel in CORE_FILES)
     assert heldout_problems(ROOT) == []
     pin = json.loads((ROOT / "eval" / "heldout.manifest.json").read_text(encoding="utf-8"))
-    assert pin["set_sha256"] == HELD_OUT_PIN
+    assert pin["set_sha256"] == (
+        "69fda69f4d2716d9f5ece79724f13d415bee268fd40990db0b3d4ca147a3bb37"
+    )
 
 
 def test_legacy_ids_labels_and_counts():
@@ -294,149 +278,13 @@ def test_legacy_ids_labels_and_counts():
     assert truth == {True: 3, False: 3}
 
 
+def test_legacy_manifest_is_written_after_labels():
+    assert not (LEGACY / "manifest.json").exists()
+    assert not (LEGACY / "MANIFEST.sha256").exists()
+
+
 def test_legacy_scenarios_match_the_core_schema_and_v0_properties():
     problems: list[str] = []
     for path in sorted(SCENARIOS.glob("*.json")):
         problems.extend(_schema_problems(path))
     assert problems == []
-
-
-def test_files_without_out_exits_2_and_writes_nothing(capsys):
-    core_json = (ROOT / "eval" / "manifest.json").read_bytes()
-    core_sha = (ROOT / "eval" / "MANIFEST.sha256").read_bytes()
-    with tempfile.TemporaryDirectory(dir=ROOT) as raw:
-        work = Path(raw)
-        destination = work / "eval"
-        destination.mkdir(parents=True)
-        (destination / "manifest.json").write_bytes(core_json)
-        (destination / "MANIFEST.sha256").write_bytes(core_sha)
-        code = main(
-            ["--root", str(work), "--files", "eval/legacy/scenarios/LG-01.json"]
-        )
-        assert code == 2
-        assert "--files requires --out" in capsys.readouterr().err
-        assert (destination / "manifest.json").read_bytes() == core_json
-        assert (destination / "MANIFEST.sha256").read_bytes() == core_sha
-        assert not (work / "eval" / "legacy" / "manifest.json").exists()
-    assert main(["--files", "eval/legacy/scenarios/LG-01.json"]) == 2
-    assert "--files requires --out" in capsys.readouterr().err
-    assert (ROOT / "eval" / "manifest.json").read_bytes() == core_json
-    assert (ROOT / "eval" / "MANIFEST.sha256").read_bytes() == core_sha
-
-
-def test_created_without_out_exits_2(capsys):
-    before = (ROOT / "eval" / "manifest.json").read_bytes()
-    assert main(["--created", "2026-11-04", "--author", "Forge"]) == 2
-    assert "--created and --author require --out" in capsys.readouterr().err
-    assert (ROOT / "eval" / "manifest.json").read_bytes() == before
-
-
-def test_legacy_check_covers_only_that_set():
-    files = _legacy_files()
-    assert main(["--check", "--out", "eval/legacy", *_file_args(files)]) == 0
-    with tempfile.TemporaryDirectory(dir=ROOT) as raw:
-        work = Path(raw)
-        _copy_tree(work, files)
-        (work / "eval").mkdir(exist_ok=True)
-        (work / "eval" / "heldout.manifest.json").write_text("{}\n", encoding="utf-8")
-        extra_core = work / "eval" / "scenarios"
-        extra_core.mkdir()
-        (extra_core / "EXTRA.json").write_bytes(b"{}\n")
-        args = ["--root", str(work), "--out", "eval/legacy", *_file_args(files)]
-        assert main([*args, "--created", LEGACY_CREATED, "--author", LEGACY_AUTHOR]) == 0
-        assert main(["--check", *args]) == 0
-        # A broken held-out pin and an extra core scenario stay out of this check.
-
-
-def test_legacy_check_names_a_changed_extra_or_missing_file(capsys):
-    files = _legacy_files()
-    with tempfile.TemporaryDirectory(dir=ROOT) as raw:
-        work = Path(raw)
-        _copy_tree(work, files)
-        args = [
-            "--root",
-            str(work),
-            "--out",
-            "eval/legacy",
-            "--created",
-            LEGACY_CREATED,
-            "--author",
-            LEGACY_AUTHOR,
-            *_file_args(files),
-        ]
-        assert main(args) == 0
-        target = work / "eval" / "legacy" / "scenarios" / "LG-01.json"
-        original = target.read_bytes()
-        target.write_bytes(original + b" ")
-        assert main(["--check", "--root", str(work), "--out", "eval/legacy", *_file_args(files)]) == 2
-        assert "mismatch eval/legacy/scenarios/LG-01.json" in capsys.readouterr().err
-        target.write_bytes(original)
-        extra = work / "eval" / "legacy" / "scenarios" / "LG-07.json"
-        extra.write_bytes(b"{}\n")
-        assert main(["--check", "--root", str(work), "--out", "eval/legacy", *_file_args(files)]) == 2
-        assert "extra eval/legacy/scenarios/LG-07.json" in capsys.readouterr().err
-        extra.unlink()
-        target.unlink()
-        assert main(["--check", "--root", str(work), "--out", "eval/legacy", *_file_args(files)]) == 2
-        assert "missing eval/legacy/scenarios/LG-01.json" in capsys.readouterr().err
-
-
-def test_generating_legacy_manifest_leaves_core_bytes_unchanged():
-    core_json = (ROOT / "eval" / "manifest.json").read_bytes()
-    core_sha = (ROOT / "eval" / "MANIFEST.sha256").read_bytes()
-    files = _legacy_files()
-    with tempfile.TemporaryDirectory(dir=ROOT) as raw:
-        work = Path(raw)
-        (work / "eval").mkdir()
-        (work / "eval" / "manifest.json").write_bytes(core_json)
-        (work / "eval" / "MANIFEST.sha256").write_bytes(core_sha)
-        _copy_tree(work, files)
-        code = main(
-            [
-                "--root",
-                str(work),
-                "--out",
-                "eval/legacy",
-                "--created",
-                LEGACY_CREATED,
-                "--author",
-                LEGACY_AUTHOR,
-                *_file_args(files),
-            ]
-        )
-        assert code == 0
-        assert (work / "eval" / "manifest.json").read_bytes() == core_json
-        assert (work / "eval" / "MANIFEST.sha256").read_bytes() == core_sha
-        written = (work / "eval" / "legacy" / "manifest.json").read_bytes()
-        recorded = (LEGACY / "manifest.json").read_bytes()
-        assert written == recorded
-        assert b"\r" not in written
-        assert written.endswith(b"\n")
-    assert (ROOT / "eval" / "manifest.json").read_bytes() == core_json
-    assert (ROOT / "eval" / "MANIFEST.sha256").read_bytes() == core_sha
-
-
-def test_default_out_keeps_core_constants_and_bytes():
-    core_json = (ROOT / "eval" / "manifest.json").read_bytes()
-    with tempfile.TemporaryDirectory(dir=ROOT) as raw:
-        work = Path(raw)
-        rel = "eval/scenarios/S3-01.json"
-        _copy_tree(work, (rel,))
-        assert main(["--root", str(work), "--out", "eval", "--files", rel]) == 0
-        document = json.loads((work / "eval" / "manifest.json").read_text(encoding="utf-8"))
-        assert document["created"] == MANIFEST_CREATED
-        assert document["author"] == MANIFEST_AUTHOR
-        assert document["version"] == 1
-    assert (ROOT / "eval" / "manifest.json").read_bytes() == core_json
-
-
-def test_default_check_does_not_scan_legacy_scenarios():
-    with tempfile.TemporaryDirectory(dir=ROOT) as raw:
-        work = Path(raw)
-        rel = "eval/scenarios/S3-01.json"
-        _copy_tree(work, (rel,))
-        legacy = work / "eval" / "legacy" / "scenarios"
-        legacy.mkdir(parents=True)
-        (legacy / "LG-07.json").write_bytes(b"{}\n")
-        assert main(["--root", str(work), "--out", "eval", "--files", rel]) == 0
-        assert check(work, (rel,), check_heldout=False) == []

@@ -205,3 +205,11 @@ Superseded by ADR 022. The union-covers-the-whole-target rule let a partial over
 **Reason.** The writer always targeted `eval/`. Passing the legacy paths as `--files` would have replaced the core freeze, and `--check --files` would have reported every core scenario as extra.
 
 **Revisit when.** The runner selects a set by name and refuses to write the core record for any other name.
+
+## ADR 027 — 2026-11-04 — --files cannot resolve onto the core manifest
+
+**Decision.** When `--files` is set, `--out` is resolved and compared case-insensitively as a path. The command exits 2 when that directory is `eval/`, `eval/scenarios`, `eval/labels`, or `eval/heldout`, for the selected root and for the repository root, and when the write would touch `eval/manifest.json` or `eval/MANIFEST.sha256`. `eval`, `./eval/`, `EVAL`, a backslash separator, and an absolute path to that directory are the same path. Every `--files` path must resolve strictly inside `--out`. `--created`, when given, must be a `YYYY-MM-DD` date, and `write_manifest` records the `created` and `author` arguments it is given. The command with neither `--files` nor `--out` still writes the core record. The legacy manifest is not committed until after labels and adjudication.
+
+**Reason.** `--out eval` and `--out ./eval/` rewrote the core freeze. `EVAL` is the same directory on a case-insensitive volume. Writing a manifest into `eval/scenarios`, `eval/labels`, or `eval/heldout` would mix a second set into the frozen tree. A sibling whose name only starts with the `--out` string is not inside that directory.
+
+**Revisit when.** The runner selects a set by name and the core record has a single writer.

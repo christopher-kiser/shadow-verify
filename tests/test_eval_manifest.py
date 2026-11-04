@@ -7,6 +7,7 @@ import re
 import tempfile
 from pathlib import Path
 
+from tests.helpers import CONDITIONS, SEED_ALLOWLIST
 from eval.manifest import (
     CORE_FILES,
     HELD_OUT_PIN,
@@ -83,44 +84,7 @@ L-03 | none | drift_after_apply | | FAIL | FAIL | F | 1
 L-04 | access_denied | unverifiable | missing_permission | NOT_ASSESSED | NOT_ASSESSED | T | 1
 """
 
-CONDITIONS = {
-    "none",
-    "wrong_region",
-    "wrong_account",
-    "stale_read",
-    "access_denied",
-    "throttling",
-    "timeout",
-    "not_found",
-    "pagination",
-    "truncated_pagination",
-    "underspecified_claim",
-    "cidr_semantics",
-    "unresolvable_source",
-}
-
-CORE_CALLS = {
-    "s3.create_bucket",
-    "s3.put_public_access_block",
-    "s3.put_bucket_encryption",
-    "s3.put_bucket_versioning",
-    "s3.put_bucket_policy",
-    "s3.delete_bucket_policy",
-    "kms.create_key",
-    "ec2.create_vpc",
-    "ec2.create_security_group",
-    "ec2.authorize_security_group_ingress",
-    "ec2.revoke_security_group_ingress",
-    "iam.create_role",
-    "iam.update_assume_role_policy",
-    "iam.create_policy",
-    "iam.create_policy_version",
-    "iam.attach_role_policy",
-    "iam.detach_role_policy",
-    "ec2.create_managed_prefix_list",
-    "dynamodb.create_table",
-    "sts.assume_role",
-}
+CORE_CALLS = SEED_ALLOWLIST
 STRETCH_CALLS = CORE_CALLS | {
     "lambda.create_function",
     "lambda.create_function_url_config",
@@ -454,23 +418,22 @@ def test_cli_check_exits_2_on_mismatch(capsys):
 
     with tempfile.TemporaryDirectory(dir=ROOT) as raw:
         work = Path(raw)
-        scenario = work / "eval" / "scenarios"
-        scenario.mkdir(parents=True)
-        target = scenario / "S3-01.json"
+        target = work / "scratch" / "scenarios" / "S3-01.json"
+        target.parent.mkdir(parents=True)
         target.write_bytes(b"{}\n")
         args = [
             "--root",
             str(work),
             "--out",
-            "eval",
+            "scratch",
             "--files",
-            "eval/scenarios/S3-01.json",
+            "scratch/scenarios/S3-01.json",
         ]
         assert main(args) == 0
         assert main(["--check", *args]) == 0
         target.write_bytes(b"{ }\n")
         assert main(["--check", *args]) == 2
-    assert "mismatch eval/scenarios/S3-01.json" in capsys.readouterr().err
+    assert "mismatch scratch/scenarios/S3-01.json" in capsys.readouterr().err
 
 
 def test_cli_rejects_paths_outside_the_repo(tmp_path: Path, capsys):
@@ -478,9 +441,9 @@ def test_cli_rejects_paths_outside_the_repo(tmp_path: Path, capsys):
 
     assert main(["--root", str(tmp_path)]) == 2
     assert "root escapes repository" in capsys.readouterr().err
-    assert main(["--out", "eval", "--files", "../outside.json"]) == 2
+    assert main(["--out", "scratch", "--files", "../outside.json"]) == 2
     assert "path escapes repository" in capsys.readouterr().err
-    assert main(["--out", "eval", "--files", "/etc/passwd"]) == 2
+    assert main(["--out", "scratch", "--files", "/etc/passwd"]) == 2
     assert "path escapes repository" in capsys.readouterr().err
     assert main(["--out", "../outside", "--files", "eval/scenarios/S3-01.json"]) == 2
     assert "path escapes repository" in capsys.readouterr().err

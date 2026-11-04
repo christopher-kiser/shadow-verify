@@ -49,4 +49,12 @@ Also left out, because Shadow Verify v0 has no place to put them:
 - Ternfield's draft processing fee, whose amount equals the shortfall. A matching unapproved decoy would be a new mechanism, so it was dropped. The population pattern is the part that was translated.
 - A NOT ASSESSED variant, such as Juniper with the read denied. The source cases never had an unobservable read. Core `ERR-*`, `S3-11`, and `IAM-09` already cover missing reads.
 
-Byte hashes of the source `ground_truth.json` files are not recorded in this tree. Those blobs are not in this repository.
+sha256 of `ground_truth.json` at `f31dee5d6a8294c7414db4ab9eab6f30e555ecdf`:
+
+| Fixture | sha256 |
+|---|---|
+| `tests/fixtures/qualification005/ground_truth.json` | `69f29e998852e348719ae236fecf282515fec29f81c147a61e3ea64a353c49c0` |
+| `tests/fixtures/qualification011/ground_truth.json` | `9ee93e6d538547bbb4640aff178fa0a0190610d603939500aeddc9374397bab9` |
+| `tests/fixtures/qualification013/ground_truth.json` | `24f97463e23d551c3be01cca79ea0fbb46e8d3e167c870c6239aaf54eb468f5d` |
+
+These are the hashes named for that commit. This workspace could not read the blobs: `christopher-kiser/raven-shadow-core` returns 404 for the commit, `christopher-kiser/raven-shadow` returns 422, and commit search returns no repository. They were not recomputed here.
