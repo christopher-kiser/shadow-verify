@@ -1,7 +1,7 @@
 """Faults injected on the verify path. Seed calls do not pass through here.
 
 ``attempts`` counts ``_make_api_call`` entries. v0's botocore retry loop
-lives inside that method, so a replaced call is one observation.
+lives inside that method, so a replaced call is one observation (ADR 027).
 """
 
 from __future__ import annotations

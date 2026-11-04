@@ -1,8 +1,18 @@
-"""Exit gate and coverage-gap classification. Expectations are not edited."""
+"""Exit gate, coverage gaps, and the summary document. Expectations are not edited."""
 
 from __future__ import annotations
 
+import hashlib
+import platform
+from datetime import datetime, timezone
+from importlib.metadata import version
+from pathlib import Path
+
+from eval.manifest import HELD_OUT_PIN
+from eval.metrics import call_stats, latency_stats, score
+
 VERDICTS = {"PASS", "FAIL", "NOT_ASSESSED"}
+_BASELINES = ("self_report", "naive_exists", "always_not_assessed", "shadow_verify")
 
 
 def is_coverage_na(row: dict) -> bool:
@@ -105,6 +115,85 @@ def headlines(rows: list[dict]) -> dict:
         "coverage_na_wrong": gap_wrong,
         "correct_na": correct,
     }
+
+
+def build_summary(root: Path, rows: list[dict], meta: dict, commit: str, stretch: bool, freeze_commit: str, set_digest: str) -> dict:
+    core = _sv(rows, "core")
+    extra = _sv(rows, "stretch")
+    versions = {}
+    for name in ("boto3", "botocore", "moto", "rfc8785"):
+        try:
+            versions[name] = version(name)
+        except Exception:
+            versions[name] = "unknown"
+    lock = root / "requirements-ci.txt"
+    lock_hash = hashlib.sha256(lock.read_bytes()).hexdigest() if lock.is_file() else None
+    return {
+        "mode": "MOCKED",
+        "label": "MOCKED",
+        "set": "core+stretch" if stretch else "core",
+        "run_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "git_commit": commit,
+        "tool_commit": commit,
+        "freeze_tag": "eval-freeze-v1",
+        "freeze_commit": freeze_commit,
+        "set_sha256": set_digest,
+        "heldout_pin_sha256": HELD_OUT_PIN,
+        "heldout_ran": False,
+        "aws_default_emulation": True,
+        "scenario_author": "Christopher",
+        "scenario_date": "2026-11-03",
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "versions": versions,
+        "lock_sha256": lock_hash,
+        "n": _counts(core),
+        "stretch_n": _counts(extra),
+        "headlines": headlines(core),
+        "stretch_headlines": headlines(extra),
+        "metrics_raw": score(core, "raw_verdict"),
+        "metrics_gated": score(core, "gated_verdict"),
+        "stretch_metrics_raw": score(extra, "raw_verdict"),
+        "baselines": {
+            name: score(_baseline(rows, name), "raw_verdict") for name in _BASELINES
+        },
+        "latency_ms": latency_stats(
+            [row["latency_ms"] for row in core if isinstance(row.get("latency_ms"), (int, float))]
+        ),
+        "calls": call_stats(core),
+        "determinism_ok": meta["determinism_ok"],
+        "tamper_detected": meta["tamper_detected"],
+        "read_only_ok": meta["read_only_ok"],
+        "note": "author-designed scenarios, not real agent traces",
+    }
+
+
+def _sv(rows: list[dict], set_name: str) -> list[dict]:
+    return [
+        row
+        for row in rows
+        if row["baseline"] == "shadow_verify" and row["set"] == set_name and row["raw_verdict"] != "ERROR"
+    ]
+
+
+def _baseline(rows: list[dict], name: str) -> list[dict]:
+    return [
+        row
+        for row in rows
+        if row["baseline"] == name and row["set"] == "core" and row["raw_verdict"] != "ERROR"
+    ]
+
+
+def _counts(rows: list[dict]) -> dict:
+    out = {name: 0 for name in ("PASS", "FAIL", "NOT_ASSESSED")}
+    truth = {"true": 0, "false": 0, "null": 0}
+    for row in rows:
+        if row.get("raw_verdict") in out:
+            out[row["raw_verdict"]] += 1
+        value = row.get("claim_true")
+        truth["true" if value is True else "false" if value is False else "null"] += 1
+    out["truth"] = truth
+    return out
 
 
 def _s3_owner_unchecked(row: dict) -> bool:

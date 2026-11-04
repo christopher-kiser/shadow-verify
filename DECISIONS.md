@@ -198,7 +198,9 @@ Superseded by ADR 022. The union-covers-the-whole-target rule let a partial over
 
 **Revisit when.** The API shape for a range without a CIDR is rejected before this checker sees it.
 
-## ADR 026 — 2026-11-04 — A value mismatch is not retried
+## ADR 027 — 2026-11-04 — A value mismatch is not retried
+
+ADR 026 is the open decision that a non-core file list needs `--out`.
 
 **Decision.** v0 does not retry a read because the value disagreed with the claim. Botocore standard mode may retry throttling and timeouts inside one API call (`MAX_ATTEMPTS` is 3, including the first try). The checker sees one observation after that. A missing bucket, security group, or role stays NOT ASSESSED (ADR 009). The eval fault injector counts a replaced `_make_api_call` as one observation, because the botocore retry loop lives inside that method.
 
@@ -206,7 +208,7 @@ Superseded by ADR 022. The union-covers-the-whole-target rule let a partial over
 
 **Revisit when.** A checker retries the whole read on throttling or a stale value, with an injected sleep, and a mismatch on the last attempt is FAIL.
 
-## ADR 027 — 2026-11-04 — The eval does not invent checks v0 lacks
+## ADR 028 — 2026-11-04 — The eval does not invent checks v0 lacks
 
 **Decision.** The eval adapter calls the v0 checkers. A resource type with no checker is NOT ASSESSED (`unsupported_resource`). A property or operator v0 does not read is NOT ASSESSED (`unsupported_property`), including S3 encryption and versioning, security-group `contains` and `equals_set`, `iam_policy`, and an IAM role claim that does not set trust, attached policies, and `no_admin_star` together. If any checked property is FAIL, the claim is FAIL. Otherwise an unchecked property keeps the claim NOT ASSESSED. The adapter does not copy live values into the claim to force a PASS.
 

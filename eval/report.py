@@ -33,7 +33,6 @@ def main(argv: list[str] | None = None) -> int:
     text = render(rows, summary)
     (out / "report.md").write_text(text, encoding="utf-8", newline="\n")
     sys.stdout.write(text)
-    _plot(out)
     return 0
 
 
@@ -205,15 +204,6 @@ def _fmt_w(bound) -> str:
     if not bound:
         return "n/a"
     return f"[{bound['low']:.3f}, {bound['high']:.3f}]"
-
-
-def _plot(_out: Path) -> None:
-    try:
-        import matplotlib  # noqa: F401
-    except ImportError:
-        print("plot skipped")
-        return
-    print("plot skipped")
 
 
 if __name__ == "__main__":

@@ -63,52 +63,72 @@ def score(rows: list[dict], predicted: str) -> dict[str, Any]:
     """Scores against ``expected_verdict`` and against ``claim_true``."""
 
     usable = [row for row in rows if row.get(predicted) in CLASSES and row.get("expected_verdict") in CLASSES]
-    matrix = confusion(usable, predicted)
-    n = len(usable)
-    gold_fail = [row for row in usable if row["expected_verdict"] == "FAIL"]
-    gold_pass = [row for row in usable if row["expected_verdict"] == "PASS"]
-    gold_na = [row for row in usable if row["expected_verdict"] == "NOT_ASSESSED"]
-    gold_decided = [row for row in usable if row["expected_verdict"] != "NOT_ASSESSED"]
-    pred_fail = [row for row in usable if row[predicted] == "FAIL"]
-    hit = sum(1 for row in gold_fail if row[predicted] == "FAIL")
-    false_fail = sum(1 for row in gold_pass if row[predicted] == "FAIL")
-    na = sum(1 for row in usable if row[predicted] == "NOT_ASSESSED")
-    wrong_pass = [row["scenario_id"] for row in usable if row[predicted] == "PASS" and row["expected_verdict"] != "PASS"]
-    decided_hit = sum(1 for row in gold_decided if row[predicted] != "NOT_ASSESSED")
-    correct = sum(1 for row in usable if row[predicted] == row["expected_verdict"])
-    na_when_gold_na = sum(1 for row in gold_na if row[predicted] == "NOT_ASSESSED")
-    over = sum(1 for row in gold_decided if row[predicted] == "NOT_ASSESSED")
+    tallies = _tallies(usable, predicted)
+    rates = _rates(tallies)
+    rates.update(
+        {
+            "n": len(usable),
+            "confusion": confusion(usable, predicted),
+            "kappa": kappa(
+                [row["expected_verdict"] for row in usable],
+                [row[predicted] for row in usable],
+            ),
+            "truth": _truth(usable, predicted),
+        }
+    )
+    return rates
+
+
+def _tallies(usable: list[dict], predicted: str) -> dict[str, Any]:
+    groups = {name: [row for row in usable if row["expected_verdict"] == name] for name in CLASSES}
+    decided = groups["PASS"] + groups["FAIL"]
+    hit = sum(1 for row in groups["FAIL"] if row[predicted] == "FAIL")
+    wrong = [row["scenario_id"] for row in usable if row[predicted] == "PASS" and row["expected_verdict"] != "PASS"]
     by_type: dict[str, dict[str, int]] = {}
-    for row in gold_fail:
+    for row in groups["FAIL"]:
         bucket = by_type.setdefault(row.get("failure_type") or "", {"expected_fail": 0, "caught": 0})
         bucket["expected_fail"] += 1
         if row[predicted] == "FAIL":
             bucket["caught"] += 1
-    truth = _truth(usable, predicted)
     return {
-        "n": n,
-        "confusion": matrix,
-        "detection": _rate(hit, len(gold_fail)),
-        "detection_wilson": wilson(hit, len(gold_fail)),
-        "false_fail": _rate(false_fail, len(gold_pass)),
-        "false_fail_wilson": wilson(false_fail, len(gold_pass)),
-        "fail_precision": _rate(hit, len(pred_fail)),
-        "na_rate": _rate(na, n),
-        "na_rate_wilson": wilson(na, n),
-        "na_honesty": _rate(na_when_gold_na, len(gold_na)),
-        "over_abstention": _rate(over, len(gold_decided)),
-        "coverage": _rate(decided_hit, len(gold_decided)),
-        "wrong_pass": len(wrong_pass),
-        "wrong_pass_ids": wrong_pass,
-        "wrong_pass_wilson": wilson(len(wrong_pass), len([row for row in usable if row["expected_verdict"] != "PASS"])),
-        "accuracy": _rate(correct, n),
-        "agreement": _rate(correct, n),
-        "kappa": kappa(
-            [row["expected_verdict"] for row in usable],
-            [row[predicted] for row in usable],
-        ),
+        "hit": hit,
+        "n_fail": len(groups["FAIL"]),
+        "n_pass": len(groups["PASS"]),
+        "n_na": len(groups["NOT_ASSESSED"]),
+        "n_decided": len(decided),
+        "n_pred_fail": sum(1 for row in usable if row[predicted] == "FAIL"),
+        "false_fail": sum(1 for row in groups["PASS"] if row[predicted] == "FAIL"),
+        "na": sum(1 for row in usable if row[predicted] == "NOT_ASSESSED"),
+        "na_when_gold_na": sum(1 for row in groups["NOT_ASSESSED"] if row[predicted] == "NOT_ASSESSED"),
+        "over": sum(1 for row in decided if row[predicted] == "NOT_ASSESSED"),
+        "covered": sum(1 for row in decided if row[predicted] != "NOT_ASSESSED"),
+        "correct": sum(1 for row in usable if row[predicted] == row["expected_verdict"]),
+        "wrong_pass": wrong,
+        "n": len(usable),
+        "not_pass": sum(1 for row in usable if row["expected_verdict"] != "PASS"),
         "by_failure_type": by_type,
-        "truth": truth,
+    }
+
+
+def _rates(counts: dict[str, Any]) -> dict[str, Any]:
+    hit, n_fail, n_pass = counts["hit"], counts["n_fail"], counts["n_pass"]
+    return {
+        "detection": _rate(hit, n_fail),
+        "detection_wilson": wilson(hit, n_fail),
+        "false_fail": _rate(counts["false_fail"], n_pass),
+        "false_fail_wilson": wilson(counts["false_fail"], n_pass),
+        "fail_precision": _rate(hit, counts["n_pred_fail"]),
+        "na_rate": _rate(counts["na"], counts["n"]),
+        "na_rate_wilson": wilson(counts["na"], counts["n"]),
+        "na_honesty": _rate(counts["na_when_gold_na"], counts["n_na"]),
+        "over_abstention": _rate(counts["over"], counts["n_decided"]),
+        "coverage": _rate(counts["covered"], counts["n_decided"]),
+        "wrong_pass": len(counts["wrong_pass"]),
+        "wrong_pass_ids": counts["wrong_pass"],
+        "wrong_pass_wilson": wilson(len(counts["wrong_pass"]), counts["not_pass"]),
+        "accuracy": _rate(counts["correct"], counts["n"]),
+        "agreement": _rate(counts["correct"], counts["n"]),
+        "by_failure_type": counts["by_failure_type"],
     }
 
 
