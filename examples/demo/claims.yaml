@@ -1,0 +1,15 @@
+# The agent wrote this after reporting the bucket as done.
+# Live state in the demo has BlockPublicPolicy set to false.
+version: 1
+claims:
+  - id: logs-bucket
+    statement: S3 bucket locked down
+    resource_type: s3_bucket
+    identifier: agent-claimed-locked
+    agent_note: Done. Public access is fully blocked and the bucket policy is not public.
+    expected:
+      block_public_acls: true
+      ignore_public_acls: true
+      block_public_policy: true
+      restrict_public_buckets: true
+      bucket_policy_public: false
