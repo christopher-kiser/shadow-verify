@@ -92,6 +92,10 @@ A security-group source that is a prefix list or another security group is `unre
 
 S3 checks are the four public-access-block flags and `GetBucketPolicyStatus.IsPublic`. They do not read object ACLs, the bucket ACL, or the account-level public access block. The IAM action for `GetPublicAccessBlock` is `s3:GetBucketPublicAccessBlock`.
 
+An `iam_role` identifier that is an ARN is compared with `Role.Arn` from `GetRole`. A different account or partition is NOT ASSESSED (`arn_mismatch`). The caller's role of the same name was not the claimed role.
+
+`no_admin_star` FAILs an Allow of `*` or `*:*` when the resource pattern matches every `arn:aws:` ARN (`*`, `arn:aws:*:*:*:*`, `arn:*:*:*:*:*`, `arn:aws:*`, and any other pattern with that coverage). An Allow of `iam:*`, `iam:Put*Policy`, `iam:Attach*Policy`, `iam:CreatePolicyVersion`, `iam:PassRole`, or a wildcard that matches one of those, on all resources is NOT ASSESSED (`may_grant_admin`).
+
 ## Development
 
 ```bash

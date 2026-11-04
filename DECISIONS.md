@@ -54,6 +54,8 @@ Superseded by ADR 021. The old rule exited 0 when every claim was PASS or NOT AS
 
 ## ADR 008 — 2026-11-03 — IAM admin is star action plus star resource
 
+Superseded for cross-account role ARNs and for all-resource patterns by ADR 030.
+
 **Decision.** `no_admin_star: true` FAILs an Allow statement whose Action is `*` or `*:*` and whose Resource is `*`. Deny does not count. `NotAction` or `NotResource` is NOT ASSESSED. Inline policies are scanned for admin and are not part of the attached-ARN set. Trust comparison uses principal values and ignores conditions. The conditions stay in the `GetRole` evidence. A role that cannot be read (`GetRole` denied or missing) stops the rest of that claim as NOT ASSESSED.
 
 **Reason.** `*:*` admin is the check v0 promised. NotAction can express admin and can express something narrower; guessing which would be a false PASS or a false FAIL. Conditions are too important to pretend we compared them, and too wide for a first cut. Stopping after a failed `GetRole` keeps the claim to one clear reason.
@@ -197,3 +199,15 @@ Superseded by ADR 022. The union-covers-the-whole-target rule let a partial over
 **Reason.** Skipping a description-only range let tcp/22 from `0.0.0.0/0` pass when the only entry was `{"Description": "x"}`.
 
 **Revisit when.** The API shape for a range without a CIDR is rejected before this checker sees it.
+
+## ADR 030 — 2026-11-04 — An unread role ARN or an admin-equivalent policy is not a pass
+
+**Decision.** Supersedes the cross-account role read and the Resource `*` clause of ADR 008.
+
+When the claim identifier is a role ARN, compare its partition and account with `Role.Arn` from `GetRole`. If either differs, or the returned Arn cannot be read, the claim is NOT ASSESSED with reason `arn_mismatch`. The checker stops after that `GetRole`. It does not treat the caller's same-named role as the claimed role. A bare role name is unchanged. A same-account, same-partition ARN still follows the existing property checks, including when the path differs.
+
+`no_admin_star` treats a resource pattern as all resources when it matches every `arn:aws:` ARN. `*` matches any character, including `:` and `/`. The patterns `*`, `arn:aws:*:*:*:*`, `arn:*:*:*:*:*`, and `arn:aws:*` are in that set, and so is any other pattern with the same coverage. An Allow of `*` or `*:*` on all resources is FAIL. An Allow of `iam:*`, `iam:Put*Policy`, `iam:Attach*Policy`, `iam:CreatePolicyVersion`, `iam:PassRole`, or another wildcard that matches one of those actions, on all resources, is NOT ASSESSED with reason `may_grant_admin`. A resource pattern that does not match every `arn:aws:` ARN stays on the previous rule. Deny does not count. `NotAction` or `NotResource` stays NOT ASSESSED.
+
+**Reason.** `GetRole` takes a role name. Dropping the account from the ARN let a claim about another account pass on the caller's role of the same name. Requiring Resource to be exactly `*` let Action `*` on `arn:aws:*:*:*:*` pass, and let `iam:*` on `*` pass. The other account was not read, so the verdict is NOT ASSESSED. A privilege-escalation action that is not literally `*` or `*:*` is not a proven admin statement and is not a pass.
+
+**Revisit when.** A read of a role in another account is an allowlisted call with its own tests, or the privilege-escalation list grows (for example `iam:SetDefaultPolicyVersion`) under the same NOT ASSESSED rule.

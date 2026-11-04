@@ -10,8 +10,16 @@ A claim must set all three:
   Inline policy names are not part of this set.
 * ``no_admin_star: true``: no Allow statement in the trust policy, an
   inline policy, or an attached policy's default version has Action
-  ``*`` or ``*:*`` and Resource ``*``. ``NotAction`` or ``NotResource``
-  makes this property NOT ASSESSED. v0 does not try to interpret them.
+  ``*`` or ``*:*`` on a resource pattern that matches every ``arn:aws:``
+  ARN. ``iam:*``, ``iam:Put*Policy``, ``iam:Attach*Policy``,
+  ``iam:CreatePolicyVersion``, ``iam:PassRole``, or a wildcard that
+  matches one of those, on all resources, is NOT ASSESSED
+  (``may_grant_admin``). ``NotAction`` or ``NotResource`` makes this
+  property NOT ASSESSED. v0 does not try to interpret them.
+
+When ``identifier`` is a role ARN, its partition and account must match
+``Role.Arn`` from ``GetRole``. A different account or partition is
+NOT ASSESSED (``arn_mismatch``): the role in the other account was not read.
 
 An unreadable policy document is NOT ASSESSED, never a pass. An attached
 ARN mismatch is FAIL even when the admin scan is also incomplete, because
@@ -56,6 +64,9 @@ class IamRoleChecker:
         evidence_ids.append(role_item.id)
         if not role_item.ok:
             return blocked(claim, call_failure("GetRole", role_item), evidence_ids)
+        mismatch = _claimed_arn_mismatch(claim.identifier, role_item.response)
+        if mismatch:
+            return blocked(claim, mismatch, evidence_ids)
 
         properties: list[PropertyResult] = []
         trust_doc, trust_error = _trust_document(role_item.response)
@@ -171,6 +182,33 @@ def role_name_from_identifier(identifier: str) -> str:
     if "/" in identifier:
         raise ClaimsError("iam_role identifier is a role name, not a path; pass a role ARN for paths")
     return identifier
+
+
+def _claimed_arn_mismatch(identifier: str, response: dict) -> str | None:
+    """NOT ASSESSED when a claimed role ARN was not the role GetRole read."""
+
+    if not identifier.startswith("arn:"):
+        return None
+    role = response.get("Role")
+    returned = role.get("Arn") if isinstance(role, dict) else None
+    claimed_id = _partition_account(identifier)
+    returned_id = _partition_account(returned) if isinstance(returned, str) else None
+    if claimed_id is None or returned_id is None or claimed_id != returned_id:
+        return (
+            "arn_mismatch: GetRole did not read the claimed role ARN; "
+            "the account or partition differs from the role in this account"
+        )
+    return None
+
+
+def _partition_account(arn: str) -> tuple[str, str] | None:
+    parts = arn.split(":")
+    if len(parts) < 6 or parts[0] != "arn" or not parts[1]:
+        return None
+    account = parts[4]
+    if len(account) != 12 or not account.isdigit():
+        return None
+    return parts[1], account
 
 
 def _trust_document(response: dict) -> tuple[dict | None, str | None]:
